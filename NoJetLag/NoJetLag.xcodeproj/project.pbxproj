@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		3EBA66682FADECDC0011A56E /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 3EBA66672FADECDC0011A56E /* FirebaseMessaging */; };
+		3EBA67892FAE601F0011A56E /* Adapty in Frameworks */ = {isa = PBXBuildFile; productRef = 3EBA67882FAE601F0011A56E /* Adapty */; };
+		3EBA678B2FAE601F0011A56E /* AdaptyUI in Frameworks */ = {isa = PBXBuildFile; productRef = 3EBA678A2FAE601F0011A56E /* AdaptyUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,7 +29,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3EBA678B2FAE601F0011A56E /* AdaptyUI in Frameworks */,
 				3EBA66682FADECDC0011A56E /* FirebaseMessaging in Frameworks */,
+				3EBA67892FAE601F0011A56E /* Adapty in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +75,8 @@
 			name = NoJetLag;
 			packageProductDependencies = (
 				3EBA66672FADECDC0011A56E /* FirebaseMessaging */,
+				3EBA67882FAE601F0011A56E /* Adapty */,
+				3EBA678A2FAE601F0011A56E /* AdaptyUI */,
 			);
 			productName = NoJetLag;
 			productReference = 3EBA662E2FADD7690011A56E /* NoJetLag.app */;
@@ -102,6 +108,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3EBA66662FADECDC0011A56E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				3EBA67872FAE601F0011A56E /* XCRemoteSwiftPackageReference "AdaptySDK-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3EBA662F2FADD7690011A56E /* Products */;
@@ -363,6 +370,14 @@
 				minimumVersion = 12.13.0;
 			};
 		};
+		3EBA67872FAE601F0011A56E /* XCRemoteSwiftPackageReference "AdaptySDK-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/adaptyteam/AdaptySDK-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.15.7;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -370,6 +385,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3EBA66662FADECDC0011A56E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		3EBA67882FAE601F0011A56E /* Adapty */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3EBA67872FAE601F0011A56E /* XCRemoteSwiftPackageReference "AdaptySDK-iOS" */;
+			productName = Adapty;
+		};
+		3EBA678A2FAE601F0011A56E /* AdaptyUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3EBA67872FAE601F0011A56E /* XCRemoteSwiftPackageReference "AdaptySDK-iOS" */;
+			productName = AdaptyUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

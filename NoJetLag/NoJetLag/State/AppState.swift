@@ -3,6 +3,12 @@ import Combine
 
 /// App-wide state container. Holds the user's sleep schedule, the active trip,
 /// and persists everything to JSON in the Documents directory.
+///
+/// ### Onboarding gate flags
+/// We split the original `hasCompletedOnboarding` into two: the user MUST see
+/// the Adapty onboarding once (`hasSeenAdaptyOnboarding`) AND must set their
+/// sleep schedule via the native sheet (`hasSetSleepSchedule`). The app is
+/// gated until both are true.
 final class AppState: ObservableObject {
     @Published var sleepSchedule: SleepSchedule {
         didSet { save() }
@@ -12,7 +18,15 @@ final class AppState: ObservableObject {
         didSet { save() }
     }
 
-    @Published var hasCompletedOnboarding: Bool {
+    /// True once the Adapty onboarding has been viewed end-to-end. Sticky:
+    /// the gate doesn't replay it on subsequent launches, even offline.
+    @Published var hasSeenAdaptyOnboarding: Bool {
+        didSet { save() }
+    }
+
+    /// True once the user has saved their bedtime + wake-up time via the
+    /// post-Adapty native sheet.
+    @Published var hasSetSleepSchedule: Bool {
         didSet { save() }
     }
 
@@ -36,17 +50,30 @@ final class AppState: ObservableObject {
 
     init(sleepSchedule: SleepSchedule = .default,
          trip: Trip? = nil,
-         hasCompletedOnboarding: Bool = false,
+         hasSeenAdaptyOnboarding: Bool = false,
+         hasSetSleepSchedule: Bool = false,
          backgroundSound: BackgroundSound = .rain,
          backgroundVolume: Double = 0.6,
          feedbackHistory: [TripFeedback] = [])
     {
         self.sleepSchedule = sleepSchedule
         self.trip = trip
-        self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.hasSeenAdaptyOnboarding = hasSeenAdaptyOnboarding
+        self.hasSetSleepSchedule = hasSetSleepSchedule
         self.backgroundSound = backgroundSound
         self.backgroundVolume = backgroundVolume
         self.feedbackHistory = feedbackHistory
+    }
+
+    /// Convenience: true only when the user is fully through both gates.
+    var isFullyOnboarded: Bool {
+        hasSeenAdaptyOnboarding && hasSetSleepSchedule
+    }
+
+    /// Reset both gate flags. **Only intended for QA / development use.**
+    func resetOnboarding() {
+        hasSetSleepSchedule = false
+        hasSeenAdaptyOnboarding = false
     }
 
     /// True if the user has already submitted feedback for the given trip.
@@ -83,10 +110,14 @@ final class AppState: ObservableObject {
     // MARK: - Persistence
 
     /// Persisted shape. New fields are optional so older snapshots still decode.
+    /// The legacy `hasCompletedOnboarding` is preserved for migration only.
     private struct Snapshot: Codable {
         var sleepSchedule: SleepSchedule
         var trip: Trip?
-        var hasCompletedOnboarding: Bool
+        // Legacy. Maps to: hasSetSleepSchedule = true, hasSeenAdaptyOnboarding = false.
+        var hasCompletedOnboarding: Bool?
+        var hasSeenAdaptyOnboarding: Bool?
+        var hasSetSleepSchedule: Bool?
         var backgroundSound: BackgroundSound?
         var backgroundVolume: Double?
         var feedbackHistory: [TripFeedback]?
@@ -103,10 +134,20 @@ final class AppState: ObservableObject {
         else {
             return AppState()
         }
+
+        // ---- Migration: old `hasCompletedOnboarding` ----
+        // Existing users who already saw the legacy native onboarding kept
+        // their sleep schedule but were never shown Adapty — force them
+        // through Adapty once.
+        let legacyCompleted = snap.hasCompletedOnboarding ?? false
+        let migratedSleepFlag = snap.hasSetSleepSchedule ?? legacyCompleted
+        let migratedAdaptyFlag = snap.hasSeenAdaptyOnboarding ?? false
+
         return AppState(
             sleepSchedule: snap.sleepSchedule,
             trip: snap.trip,
-            hasCompletedOnboarding: snap.hasCompletedOnboarding,
+            hasSeenAdaptyOnboarding: migratedAdaptyFlag,
+            hasSetSleepSchedule: migratedSleepFlag,
             backgroundSound: snap.backgroundSound ?? .rain,
             backgroundVolume: snap.backgroundVolume ?? 0.6,
             feedbackHistory: snap.feedbackHistory ?? []
@@ -117,7 +158,9 @@ final class AppState: ObservableObject {
         let snap = Snapshot(
             sleepSchedule: sleepSchedule,
             trip: trip,
-            hasCompletedOnboarding: hasCompletedOnboarding,
+            hasCompletedOnboarding: nil,    // legacy field — no longer written
+            hasSeenAdaptyOnboarding: hasSeenAdaptyOnboarding,
+            hasSetSleepSchedule: hasSetSleepSchedule,
             backgroundSound: backgroundSound,
             backgroundVolume: backgroundVolume,
             feedbackHistory: feedbackHistory

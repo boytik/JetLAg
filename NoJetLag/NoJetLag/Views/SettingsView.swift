@@ -20,6 +20,9 @@ struct SettingsView: View {
                         feedbackGroup
                         importantGroup
                         versionGroup
+                        #if DEBUG
+                        debugGroup
+                        #endif
                     }
                     .padding(.horizontal, Spacing.lg)
                     .padding(.top, Spacing.md)
@@ -383,6 +386,42 @@ struct SettingsView: View {
             }
         }
     }
+
+    #if DEBUG
+    /// QA-only controls. Compiled out of release builds.
+    private var debugGroup: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "DEBUG · QA ONLY")
+                .padding(.horizontal, Spacing.xs)
+
+            InstrumentCard(padding: 0) {
+                VStack(spacing: 0) {
+                    Button {
+                        state.resetOnboarding()
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Reset onboarding")
+                                    .font(Typography.body(15, weight: .medium))
+                                    .foregroundStyle(Color.advisoryRed)
+                                Text("Adapty + sleep schedule gates")
+                                    .font(Typography.mono(11))
+                                    .foregroundStyle(Color.textLo)
+                            }
+                            Spacer()
+                            Text("→")
+                                .font(Typography.mono(13, weight: .medium))
+                                .foregroundStyle(Color.advisoryRed)
+                        }
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.vertical, Spacing.md)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+    #endif
 
     // MARK: Pieces
 

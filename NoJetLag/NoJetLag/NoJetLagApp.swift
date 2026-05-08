@@ -7,6 +7,21 @@ struct NoJetLagApp: App {
 
     init() {
         Self.configureAppearance()
+        Self.activateAdaptyIfPossible()
+    }
+
+    /// One-shot Adapty SDK activation. Call this BEFORE any view tries to
+    /// fetch onboarding/paywall content.
+    ///
+    /// **TODO(adapty):** once AdaptySDK is imported in this target:
+    ///   1. Add `import Adapty` and `import AdaptyUI` at the top of this file.
+    ///   2. Replace the body below with:
+    ///         Adapty.activate("YOUR_PUBLIC_SDK_KEY")
+    ///         AdaptyUI.activate()
+    ///   3. (Optional) set `AdaptyUI.delegate = …` if you need analytics hooks.
+    private static func activateAdaptyIfPossible() {
+        // Placeholder — no-op. The AdaptyOnboardingHost shows a stub until
+        // this is wired.
     }
 
     var body: some Scene {
