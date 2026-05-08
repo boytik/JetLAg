@@ -1,5 +1,5 @@
 import SwiftUI
-
+import Combine
 /// Current/next-action card. The first thing the user opens during a trip.
 struct NowView: View {
     @EnvironmentObject private var state: AppState
@@ -31,7 +31,7 @@ struct NowView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if let current = state.currentEvent(at: now) {
-                    bigCard(title: "Right now", event: current, accent: .tint)
+                    bigCard(title: "Right now", event: current, accent: .accentColor)
                 } else if let next = state.nextEvent(after: now) {
                     bigCard(title: countdown(to: next.startsAt), event: next, accent: .secondary)
                 } else {
