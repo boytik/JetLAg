@@ -19,39 +19,59 @@ struct TimeZonePicker: View {
 
     var body: some View {
         NavigationStack {
-            List(filtered, id: \.self) { id in
-                Button {
-                    selection = id
-                    dismiss()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(displayName(for: id))
-                                .foregroundStyle(.primary)
-                            Text(id)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(offsetLabel(for: id))
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                        if id == selection {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.tint)
+            ZStack {
+                Color.bg0.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(filtered, id: \.self) { id in
+                            row(for: id)
+                            Hairline()
                         }
                     }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
                 }
             }
-            .navigationTitle("Time zone")
+            .navigationTitle("TIME ZONE")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "Search city")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("CANCEL") { dismiss() }
+                        .font(Typography.mono(11, weight: .semibold))
+                        .foregroundStyle(Color.textLo)
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func row(for id: String) -> some View {
+        Button {
+            selection = id
+            dismiss()
+        } label: {
+            HStack(alignment: .center, spacing: Spacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayName(for: id))
+                        .font(Typography.body(15, weight: .medium))
+                        .foregroundStyle(Color.textHi)
+                    Text(id)
+                        .font(Typography.mono(11))
+                        .foregroundStyle(Color.textLo)
+                }
+                Spacer()
+                Text(offsetLabel(for: id))
+                    .font(Typography.mono(12, weight: .medium))
+                    .foregroundStyle(Color.textMid)
+                if id == selection {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Color.amber)
+                }
+            }
+            .padding(.vertical, Spacing.sm)
+        }
+        .buttonStyle(.plain)
     }
 
     private func displayName(for id: String) -> String {

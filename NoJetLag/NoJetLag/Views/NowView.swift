@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+
 /// Current/next-action card. The first thing the user opens during a trip.
 struct NowView: View {
     @EnvironmentObject private var state: AppState
@@ -10,14 +11,24 @@ struct NowView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if state.trip == nil {
-                    emptyState
-                } else {
-                    content
+            ZStack {
+                Color.bg0.ignoresSafeArea()
+                Group {
+                    if state.trip == nil {
+                        emptyState
+                    } else {
+                        content
+                    }
                 }
             }
-            .navigationTitle("Now")
+            .navigationTitle("NOW")
+            .toolbar {
+                if let trip = state.trip {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        navStatus(for: trip)
+                    }
+                }
+            }
             .sheet(isPresented: $showingNewTrip) {
                 NewTripView()
             }
@@ -29,11 +40,11 @@ struct NowView: View {
 
     private var content: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: Spacing.md) {
                 if let current = state.currentEvent(at: now) {
-                    bigCard(title: "Right now", event: current, accent: .accentColor)
+                    activeCard(event: current)
                 } else if let next = state.nextEvent(after: now) {
-                    bigCard(title: countdown(to: next.startsAt), event: next, accent: .secondary)
+                    nextCard(event: next)
                 } else {
                     completionCard
                 }
@@ -44,158 +55,284 @@ struct NowView: View {
 
                 upcomingList
             }
-            .padding(16)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xl)
         }
-        .background(Color(.systemGroupedBackground))
     }
 
-    private func bigCard(title: String, event: PlanEvent, accent: Color) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(title.uppercased())
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+    // MARK: Cards
 
-            HStack(alignment: .center, spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(accent.opacity(0.18))
-                        .frame(width: 56, height: 56)
-                    Image(systemName: event.kind.icon)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(accent)
+    private func activeCard(event: PlanEvent) -> some View {
+        ActiveCard {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack {
+                    HStack(spacing: Spacing.sm) {
+                        PulsingDot(size: 6)
+                        Text("RIGHT NOW")
+                            .font(Typography.mono(10, weight: .semibold))
+                            .trackedUppercase(1.6)
+                            .foregroundStyle(Color.amber)
+                    }
+                    Spacer()
+                    if let end = event.endsAt {
+                        Text("UNTIL \(timeString(end, tz: event.displayTimeZone))")
+                            .font(Typography.mono(10, weight: .semibold))
+                            .trackedUppercase(1.4)
+                            .foregroundStyle(Color.textLo)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(event.kind.title)
-                        .font(.title2.weight(.semibold))
-                    Text(timeRange(event))
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
 
-            if let note = event.note {
-                Text(note)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(event.kind.title.uppercased())
+                    .font(Typography.display(26, weight: .semibold))
+                    .foregroundStyle(Color.amber)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let end = event.endsAt {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                        Text(remainingString(until: end))
+                            .font(Typography.mono(28, weight: .medium))
+                            .foregroundStyle(Color.textHi)
+                            .tracking(-0.5)
+                        Text("REMAINING")
+                            .font(Typography.mono(10, weight: .semibold))
+                            .trackedUppercase(1.6)
+                            .foregroundStyle(Color.textLo)
+                    }
+                }
+
+                Text(timeRange(event))
+                    .font(Typography.mono(12, weight: .medium))
+                    .foregroundStyle(Color.textMid)
+                    .tracking(0.5)
+
+                if let note = event.note {
+                    Text(note)
+                        .font(Typography.body(13))
+                        .foregroundStyle(Color.textMid)
+                        .padding(.top, Spacing.xs)
+                }
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func nextCard(event: PlanEvent) -> some View {
+        InstrumentCard {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                SectionTag(
+                    text: "NEXT UP",
+                    color: .textLo,
+                    trailing: timeString(event.startsAt, tz: event.displayTimeZone)
+                )
+                Text(event.kind.title)
+                    .font(Typography.display(22, weight: .semibold))
+                    .foregroundStyle(Color.textHi)
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                    Text(countdown(to: event.startsAt))
+                        .font(Typography.mono(20, weight: .medium))
+                        .foregroundStyle(Color.amber)
+                    Spacer()
+                    EventBadge(kind: event.kind)
+                }
+                if let note = event.note {
+                    Text(note)
+                        .font(Typography.body(13))
+                        .foregroundStyle(Color.textMid)
+                        .padding(.top, Spacing.xs)
+                }
+            }
+        }
     }
 
     private var completionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("ALL DONE")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text("You've completed the protocol")
-                .font(.title2.weight(.semibold))
-            Text("Your circadian system should now be aligned with the destination timezone.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        InstrumentCard {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                SectionTag(text: "ALL DONE")
+                Text("Protocol complete")
+                    .font(Typography.display(22, weight: .semibold))
+                    .foregroundStyle(Color.textHi)
+                Text("Your circadian system should now be aligned with the destination timezone.")
+                    .font(Typography.body(13))
+                    .foregroundStyle(Color.textMid)
+            }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
+
+    // MARK: Trip summary
 
     private func tripSummary(_ trip: Trip) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "airplane")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trip.name)
-                    .font(.subheadline.weight(.semibold))
-                Text(directionText(for: trip))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var upcomingList: some View {
-        let upcoming = state.plan.filter { $0.startsAt > now }.prefix(4)
-        return Group {
-            if !upcoming.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Coming up")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
-                    VStack(spacing: 0) {
-                        ForEach(Array(upcoming.enumerated()), id: \.element.id) { idx, ev in
-                            EventRow(event: ev)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 4)
-                            if idx < upcoming.count - 1 {
-                                Divider().padding(.leading, 68)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        InstrumentCard(padding: Spacing.md) {
+            HStack {
+                Text(routeText(trip))
+                    .font(Typography.mono(16, weight: .medium))
+                    .foregroundStyle(Color.textHi)
+                    .tracking(0.5)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(shiftText(trip))
+                        .font(Typography.mono(10, weight: .semibold))
+                        .trackedUppercase(1.4)
+                        .foregroundStyle(Color.amber)
+                    Text(trip.name)
+                        .font(Typography.body(11))
+                        .foregroundStyle(Color.textLo)
+                        .lineLimit(1)
                 }
             }
         }
     }
 
+    // MARK: Upcoming list
+
+    private var upcomingList: some View {
+        let upcoming = Array(state.plan.filter { $0.startsAt > now }.prefix(4))
+        return Group {
+            if !upcoming.isEmpty {
+                InstrumentCard {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        SectionTag(
+                            text: "UPCOMING",
+                            color: .textLo,
+                            trailing: upcoming.first?.displayTimeZone.abbreviation()
+                        )
+                        .padding(.bottom, Spacing.xs)
+
+                        HStack(alignment: .top, spacing: Spacing.md) {
+                            AltitudeRule()
+                                .frame(maxHeight: .infinity)
+                            VStack(spacing: 0) {
+                                ForEach(Array(upcoming.enumerated()), id: \.element.id) { idx, ev in
+                                    EventRow(event: ev)
+                                    if idx < upcoming.count - 1 {
+                                        Hairline()
+                                    }
+                                }
+                            }
+                        }
+                        .frame(minHeight: 40)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Empty state
+
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "airplane.circle")
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.tint)
-            Text("No active trip")
-                .font(.title2.weight(.semibold))
-            Text("Tell us about your flight to see what to do right now.")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+        VStack(spacing: Spacing.lg) {
+            Spacer()
+            VStack(spacing: Spacing.sm) {
+                Text("NO ACTIVE TRIP")
+                    .font(Typography.mono(11, weight: .semibold))
+                    .trackedUppercase(1.6)
+                    .foregroundStyle(Color.textLo)
+                Text("Add your flight to begin the protocol.")
+                    .font(Typography.body(15))
+                    .foregroundStyle(Color.textMid)
+                    .multilineTextAlignment(.center)
+            }
+
             Button {
                 showingNewTrip = true
             } label: {
-                Label("Plan a trip", systemImage: "plus")
-                    .font(.headline)
-                    .frame(maxWidth: 280)
-                    .padding(.vertical, 10)
+                Text("PLAN A TRIP")
+                    .trackedUppercase(1.4)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.instrument)
+            .padding(.horizontal, Spacing.xxl)
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .padding(Spacing.lg)
+    }
+
+    // MARK: Nav-status accessory
+
+    private func navStatus(for trip: Trip) -> some View {
+        let totalDays = max(1, dayCount(for: trip))
+        let day = max(1, currentDayIndex(for: trip))
+        return VStack(alignment: .trailing, spacing: 1) {
+            Text("DAY \(String(format: "%02d", day)) / \(String(format: "%02d", totalDays))")
+                .font(Typography.mono(9, weight: .semibold))
+                .trackedUppercase(1.4)
+                .foregroundStyle(Color.textLo)
+            HStack(spacing: 4) {
+                Circle().fill(Color.amber).frame(width: 5, height: 5)
+                Text("ON TRACK")
+                    .font(Typography.mono(9, weight: .semibold))
+                    .trackedUppercase(1.4)
+                    .foregroundStyle(Color.amber)
+            }
+        }
+    }
+
+    private func dayCount(for trip: Trip) -> Int {
+        guard let first = state.plan.first?.startsAt,
+              let last = state.plan.last?.startsAt else { return 1 }
+        let days = Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0
+        return max(1, days + 1)
+    }
+
+    private func currentDayIndex(for trip: Trip) -> Int {
+        guard let first = state.plan.first?.startsAt else { return 1 }
+        let days = Calendar.current.dateComponents([.day], from: first, to: now).day ?? 0
+        return max(1, days + 1)
     }
 
     // MARK: - Formatting
 
+    private func timeString(_ date: Date, tz: TimeZone) -> String {
+        let f = DateFormatter()
+        f.timeZone = tz
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
+    }
+
     private func timeRange(_ event: PlanEvent) -> String {
-        let fmt = DateFormatter()
-        fmt.timeZone = event.displayTimeZone
-        fmt.timeStyle = .short
-        let start = fmt.string(from: event.startsAt)
+        let start = timeString(event.startsAt, tz: event.displayTimeZone)
+        let abbr = event.displayTimeZone.abbreviation() ?? ""
         if let end = event.endsAt {
-            return "\(start) – \(fmt.string(from: end))  \(event.displayTimeZone.abbreviation() ?? "")"
+            return "\(start) — \(timeString(end, tz: event.displayTimeZone)) \(abbr)"
         }
-        return "\(start)  \(event.displayTimeZone.abbreviation() ?? "")"
+        return "\(start) \(abbr)"
+    }
+
+    private func remainingString(until date: Date) -> String {
+        let interval = Int(date.timeIntervalSince(now))
+        guard interval > 0 else { return "00:00" }
+        let h = interval / 3600
+        let m = (interval % 3600) / 60
+        return String(format: "%02d:%02d", h, m)
     }
 
     private func countdown(to date: Date) -> String {
-        let interval = date.timeIntervalSince(now)
-        guard interval > 0 else { return "Up next" }
-        let h = Int(interval) / 3600
-        let m = (Int(interval) % 3600) / 60
-        if h >= 1 { return "In \(h)h \(m)m" }
-        return "In \(max(m, 1))m"
+        let interval = Int(date.timeIntervalSince(now))
+        guard interval > 0 else { return "NOW" }
+        let h = interval / 3600
+        let m = (interval % 3600) / 60
+        if h >= 1 { return String(format: "IN %dH %02dM", h, m) }
+        return String(format: "IN %dM", max(m, 1))
     }
 
-    private func directionText(for trip: Trip) -> String {
-        let s = trip.timeZoneShiftHours
-        if abs(s) < 1 { return "Same timezone" }
-        let h = String(format: "%.1f", abs(s))
-        return s > 0 ? "Eastward · advance \(h)h" : "Westward · delay \(h)h"
+    private func routeText(_ trip: Trip) -> String {
+        "\(airportCode(trip.originTimeZoneId)) → \(airportCode(trip.destinationTimeZoneId))"
+    }
+
+    private func airportCode(_ tzId: String) -> String {
+        // Best-effort: take last path component, take first 3 letters uppercased.
+        // Real airport-code mapping is out of scope for this design pass.
+        let last = tzId.split(separator: "/").last.map(String.init) ?? tzId
+        let cleaned = last.replacingOccurrences(of: "_", with: "")
+        return String(cleaned.prefix(3)).uppercased()
+    }
+
+    private func shiftText(_ trip: Trip) -> String {
+        let shift = trip.timeZoneShiftHours
+        if abs(shift) < 1 { return "SAME TZ" }
+        let sign = shift > 0 ? "+" : "-"
+        let h = Int(abs(shift).rounded())
+        let dir = shift > 0 ? "ADVANCE" : "DELAY"
+        return "\(sign)\(String(format: "%02d", h))H · \(dir)"
     }
 }

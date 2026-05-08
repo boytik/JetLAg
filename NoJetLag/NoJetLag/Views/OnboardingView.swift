@@ -7,71 +7,83 @@ struct OnboardingView: View {
     @State private var wake: Date    = Self.makeTime(hour: 7, minute: 0)
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+            Color.bg0.ignoresSafeArea()
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
                     header
-
-                    card {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Usual sleep schedule")
-                                .font(.headline)
-
-                            HStack {
-                                Label("Bedtime", systemImage: "moon.fill")
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                DatePicker("", selection: $bedtime, displayedComponents: .hourAndMinute)
-                                    .labelsHidden()
-                            }
-                            Divider()
-                            HStack {
-                                Label("Wake up", systemImage: "alarm.fill")
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                DatePicker("", selection: $wake, displayedComponents: .hourAndMinute)
-                                    .labelsHidden()
-                            }
-                        }
-                    }
-
-                    Text("This is the only personal data we need to start. Everything is computed and stored locally on your device.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
+                    scheduleCard
+                    footnote
                     Button(action: complete) {
-                        Text("Continue")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                        Text("CONTINUE")
+                            .trackedUppercase(1.4)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .buttonStyle(.instrument)
                 }
-                .padding(20)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.xxl)
+                .padding(.bottom, Spacing.xl)
             }
-            .background(Color(.systemGroupedBackground))
         }
     }
+
+    // MARK: - Pieces
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "airplane.departure")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(.tint)
-                .padding(.bottom, 8)
-            Text("Welcome to NoJetLag")
-                .font(.largeTitle.weight(.semibold))
-            Text("A personal light-and-sleep schedule that helps your body re-sync to a new timezone.")
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack(spacing: Spacing.sm) {
+                PulsingDot(size: 6)
+                Text("BOOT · v0.1")
+                    .font(Typography.mono(10, weight: .semibold))
+                    .trackedUppercase(1.6)
+                    .foregroundStyle(Color.amber)
+            }
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("NoJetLag")
+                    .font(Typography.display(36, weight: .semibold))
+                    .foregroundStyle(Color.textHi)
+                    .tracking(-0.5)
+                Text("Personal circadian-shift schedule from your flight.")
+                    .font(Typography.body(15))
+                    .foregroundStyle(Color.textMid)
+            }
+        }
+        .padding(.bottom, Spacing.sm)
+    }
+
+    private var scheduleCard: some View {
+        InstrumentCard {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                SectionTag(text: "Usual sleep schedule")
+                    .padding(.bottom, Spacing.xs)
+
+                HStack {
+                    Text("Bedtime")
+                        .font(Typography.body(15, weight: .medium))
+                        .foregroundStyle(Color.textHi)
+                    Spacer()
+                    DatePicker("", selection: $bedtime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .tint(Color.amber)
+                }
+                Hairline()
+                HStack {
+                    Text("Wake up")
+                        .font(Typography.body(15, weight: .medium))
+                        .foregroundStyle(Color.textHi)
+                    Spacer()
+                    DatePicker("", selection: $wake, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .tint(Color.amber)
+                }
+            }
         }
     }
 
-    @ViewBuilder
-    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        content()
-            .padding(16)
-            .background(.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    private var footnote: some View {
+        Text("This is the only personal data we need to start. Everything is computed and stored on-device.")
+            .font(Typography.body(12))
+            .foregroundStyle(Color.textLo)
     }
 
     private func complete() {

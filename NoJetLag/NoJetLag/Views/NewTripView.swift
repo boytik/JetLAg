@@ -15,47 +15,34 @@ struct NewTripView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Route") {
-                    Button {
-                        showingOriginPicker = true
-                    } label: {
-                        labeledField("From", value: cityName(originTZ), accessory: offsetLabel(originTZ))
-                    }
-                    Button {
-                        showingDestPicker = true
-                    } label: {
-                        labeledField("To", value: cityName(destinationTZ), accessory: offsetLabel(destinationTZ))
-                    }
-                }
-
-                Section("Schedule") {
-                    DatePicker("Departure", selection: $departure)
-                    DatePicker("Arrival",   selection: $arrival, in: departure...)
-                }
-
-                if let preview = shiftPreview {
-                    Section {
-                        HStack {
-                            Image(systemName: preview.icon)
-                                .foregroundStyle(.tint)
-                            Text(preview.text)
-                                .foregroundStyle(.secondary)
+            ZStack {
+                Color.bg0.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Spacing.lg) {
+                        routeGroup
+                        scheduleGroup
+                        if let preview = shiftPreview {
+                            directionGroup(preview)
                         }
-                    } header: {
-                        Text("Direction")
                     }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.top, Spacing.md)
+                    .padding(.bottom, Spacing.xl)
                 }
             }
-            .navigationTitle(state.trip == nil ? "Plan a trip" : "Edit trip")
+            .navigationTitle(state.trip == nil ? "PLAN A TRIP" : "EDIT TRIP")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("CANCEL") { dismiss() }
+                        .font(Typography.mono(11, weight: .semibold))
+                        .foregroundStyle(Color.textLo)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button("SAVE", action: save)
                         .disabled(originTZ == destinationTZ)
+                        .font(Typography.mono(11, weight: .semibold))
+                        .foregroundStyle(originTZ == destinationTZ ? Color.textLo : Color.amber)
                 }
             }
             .sheet(isPresented: $showingOriginPicker) {
@@ -68,27 +55,112 @@ struct NewTripView: View {
         }
     }
 
-    // MARK: - Pieces
+    // MARK: Groups
 
-    @ViewBuilder
-    private func labeledField(_ label: String, value: String, accessory: String) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 12)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(value)
-                    .foregroundStyle(.primary)
-                Text(accessory)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private var routeGroup: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "ROUTE")
+                .padding(.horizontal, Spacing.xs)
+            InstrumentCard(padding: 0) {
+                VStack(spacing: 0) {
+                    Button { showingOriginPicker = true } label: {
+                        routeRow(label: "FROM", tzId: originTZ)
+                    }
+                    .buttonStyle(.plain)
+                    Hairline()
+                    Button { showingDestPicker = true } label: {
+                        routeRow(label: "TO", tzId: destinationTZ)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
 
+    private var scheduleGroup: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "SCHEDULE")
+                .padding(.horizontal, Spacing.xs)
+            InstrumentCard(padding: 0) {
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Departure")
+                            .font(Typography.body(15, weight: .medium))
+                            .foregroundStyle(Color.textHi)
+                        Spacer()
+                        DatePicker("", selection: $departure)
+                            .labelsHidden()
+                            .tint(Color.amber)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                    Hairline()
+                    HStack {
+                        Text("Arrival")
+                            .font(Typography.body(15, weight: .medium))
+                            .foregroundStyle(Color.textHi)
+                        Spacer()
+                        DatePicker("", selection: $arrival, in: departure...)
+                            .labelsHidden()
+                            .tint(Color.amber)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                }
+            }
+        }
+    }
+
+    private func directionGroup(_ preview: ShiftPreview) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "DIRECTION")
+                .padding(.horizontal, Spacing.xs)
+            InstrumentCard {
+                HStack(spacing: Spacing.md) {
+                    Text(preview.code)
+                        .font(Typography.mono(13, weight: .semibold))
+                        .trackedUppercase(1.4)
+                        .foregroundStyle(preview.tint)
+                    Text(preview.text)
+                        .font(Typography.body(13))
+                        .foregroundStyle(Color.textMid)
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    // MARK: Pieces
+
+    @ViewBuilder
+    private func routeRow(label: String, tzId: String) -> some View {
+        HStack(alignment: .center, spacing: Spacing.md) {
+            Text(label)
+                .font(Typography.mono(11, weight: .semibold))
+                .trackedUppercase(1.4)
+                .foregroundStyle(Color.textLo)
+                .frame(width: 48, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cityName(tzId))
+                    .font(Typography.body(15, weight: .medium))
+                    .foregroundStyle(Color.textHi)
+                Text(offsetLabel(tzId))
+                    .font(Typography.mono(11))
+                    .foregroundStyle(Color.textLo)
+            }
+            Spacer()
+            Text("→")
+                .font(Typography.mono(13, weight: .medium))
+                .foregroundStyle(Color.amber)
+        }
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.md)
+    }
+
     private struct ShiftPreview {
         let text: String
-        let icon: String
+        let code: String
+        let tint: Color
     }
 
     private var shiftPreview: ShiftPreview? {
@@ -104,12 +176,12 @@ struct NewTripView: View {
 
         let absStr = String(format: "%.1f", abs(delta))
         if abs(delta) < 1 {
-            return .init(text: "Same timezone — no jet lag protocol needed.", icon: "checkmark.circle.fill")
+            return .init(text: "Same timezone — no jet lag protocol needed.", code: "SAME TZ", tint: .caffeineGreen)
         }
         if delta > 0 {
-            return .init(text: "Eastward — body must shift \(absStr)h earlier.", icon: "arrow.up.right.circle.fill")
+            return .init(text: "Eastward — body must shift \(absStr)h earlier.", code: "+\(absStr)H · ADVANCE", tint: .amber)
         }
-        return .init(text: "Westward — body must shift \(absStr)h later.", icon: "arrow.down.right.circle.fill")
+        return .init(text: "Westward — body must shift \(absStr)h later.", code: "-\(absStr)H · DELAY", tint: .sleepIndigo)
     }
 
     // MARK: - Helpers
@@ -125,7 +197,7 @@ struct NewTripView: View {
         let secs = tz.secondsFromGMT(for: arrival)
         let sign = secs >= 0 ? "+" : "-"
         let mag = abs(secs)
-        return String(format: "GMT%@%d:%02d  •  %@", sign, mag / 3600, (mag % 3600) / 60, id)
+        return String(format: "GMT%@%d:%02d  ·  %@", sign, mag / 3600, (mag % 3600) / 60, id)
     }
 
     private func hydrateFromExistingTrip() {

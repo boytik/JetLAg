@@ -6,17 +6,20 @@ struct RootView: View {
     @EnvironmentObject private var state: AppState
 
     var body: some View {
-        if !state.hasCompletedOnboarding {
-            OnboardingView()
-                .transition(.opacity)
-        } else {
-            TabView {
-                NowView()
-                    .tabItem { Label("Now", systemImage: "circle.dashed") }
-                PlanView()
-                    .tabItem { Label("Plan", systemImage: "calendar") }
-                SettingsView()
-                    .tabItem { Label("Settings", systemImage: "gearshape") }
+        ZStack {
+            Color.bg0.ignoresSafeArea()
+            if !state.hasCompletedOnboarding {
+                OnboardingView()
+                    .transition(.opacity)
+            } else {
+                TabView {
+                    NowView()
+                        .tabItem { Label("NOW", systemImage: "circle.dashed") }
+                    PlanView()
+                        .tabItem { Label("PLAN", systemImage: "calendar") }
+                    SettingsView()
+                        .tabItem { Label("SETTINGS", systemImage: "gearshape") }
+                }
             }
         }
     }
