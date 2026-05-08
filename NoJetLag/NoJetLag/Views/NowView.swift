@@ -6,6 +6,8 @@ struct NowView: View {
     @EnvironmentObject private var state: AppState
     @State private var now = Date()
     @State private var showingNewTrip = false
+    @State private var explainingEvent: PlanEvent?
+    @State private var showingFeedback = false
 
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -14,14 +16,19 @@ struct NowView: View {
             ZStack {
                 Color.bg0.ignoresSafeArea()
                 Group {
-                    if state.trip == nil {
-                        emptyState
+                    if let trip = state.trip {
+                        if trip.isCurrentlyInFlight(at: now) {
+                            InFlightView(trip: trip, now: now)
+                        } else {
+                            content
+                        }
                     } else {
-                        content
+                        emptyState
                     }
                 }
             }
-            .navigationTitle("NOW")
+            .navigationTitle(navTitle)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if let trip = state.trip {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -32,8 +39,23 @@ struct NowView: View {
             .sheet(isPresented: $showingNewTrip) {
                 NewTripView()
             }
+            .sheet(item: $explainingEvent) { ev in
+                EventDetailView(event: ev)
+            }
+            .sheet(isPresented: $showingFeedback) {
+                if let trip = state.trip {
+                    FeedbackEntryView(trip: trip)
+                }
+            }
             .onReceive(ticker) { now = $0 }
         }
+    }
+
+    private var navTitle: String {
+        if let trip = state.trip, trip.isCurrentlyInFlight(at: now) {
+            return "IN FLIGHT"
+        }
+        return "NOW"
     }
 
     // MARK: - Subviews
@@ -41,6 +63,10 @@ struct NowView: View {
     private var content: some View {
         ScrollView {
             VStack(spacing: Spacing.md) {
+                if shouldShowFeedbackCTA {
+                    feedbackCTA
+                }
+
                 if let current = state.currentEvent(at: now) {
                     activeCard(event: current)
                 } else if let next = state.nextEvent(after: now) {
@@ -61,88 +87,158 @@ struct NowView: View {
         }
     }
 
-    // MARK: Cards
+    /// Show the feedback CTA after the user has landed and we don't have
+    /// feedback for this trip yet.
+    private var shouldShowFeedbackCTA: Bool {
+        guard let trip = state.trip else { return false }
+        guard now > trip.arrival else { return false }
+        return !state.hasFeedback(for: trip.id)
+    }
 
-    private func activeCard(event: PlanEvent) -> some View {
-        ActiveCard {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                HStack {
-                    HStack(spacing: Spacing.sm) {
-                        PulsingDot(size: 6)
-                        Text("RIGHT NOW")
+    private var feedbackCTA: some View {
+        Button {
+            showingFeedback = true
+        } label: {
+            InstrumentCard {
+                HStack(alignment: .top, spacing: Spacing.md) {
+                    Rectangle()
+                        .fill(Color.amber)
+                        .frame(width: 2)
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text("TRIP COMPLETE")
                             .font(Typography.mono(10, weight: .semibold))
                             .trackedUppercase(1.6)
                             .foregroundStyle(Color.amber)
+                        Text("How did it go?")
+                            .font(Typography.display(20, weight: .semibold))
+                            .foregroundStyle(Color.textHi)
+                        Text("Three questions. Stays on-device, optional email export.")
+                            .font(Typography.body(12))
+                            .foregroundStyle(Color.textMid)
                     }
                     Spacer()
-                    if let end = event.endsAt {
-                        Text("UNTIL \(timeString(end, tz: event.displayTimeZone))")
-                            .font(Typography.mono(10, weight: .semibold))
-                            .trackedUppercase(1.4)
-                            .foregroundStyle(Color.textLo)
-                    }
-                }
-
-                Text(event.kind.title.uppercased())
-                    .font(Typography.display(26, weight: .semibold))
-                    .foregroundStyle(Color.amber)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let end = event.endsAt {
-                    HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
-                        Text(remainingString(until: end))
-                            .font(Typography.mono(28, weight: .medium))
-                            .foregroundStyle(Color.textHi)
-                            .tracking(-0.5)
-                        Text("REMAINING")
-                            .font(Typography.mono(10, weight: .semibold))
-                            .trackedUppercase(1.6)
-                            .foregroundStyle(Color.textLo)
-                    }
-                }
-
-                Text(timeRange(event))
-                    .font(Typography.mono(12, weight: .medium))
-                    .foregroundStyle(Color.textMid)
-                    .tracking(0.5)
-
-                if let note = event.note {
-                    Text(note)
-                        .font(Typography.body(13))
-                        .foregroundStyle(Color.textMid)
-                        .padding(.top, Spacing.xs)
+                    Text("→")
+                        .font(Typography.mono(15, weight: .semibold))
+                        .foregroundStyle(Color.amber)
                 }
             }
         }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Cards
+
+    private func activeCard(event: PlanEvent) -> some View {
+        Button {
+            explainingEvent = event
+        } label: {
+            ActiveCard {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    HStack {
+                        HStack(spacing: Spacing.sm) {
+                            PulsingDot(size: 6)
+                            Text("RIGHT NOW")
+                                .font(Typography.mono(10, weight: .semibold))
+                                .trackedUppercase(1.6)
+                                .foregroundStyle(Color.amber)
+                        }
+                        Spacer()
+                        if let end = event.endsAt {
+                            Text("UNTIL \(timeString(end, tz: event.displayTimeZone))")
+                                .font(Typography.mono(10, weight: .semibold))
+                                .trackedUppercase(1.4)
+                                .foregroundStyle(Color.textLo)
+                        }
+                    }
+
+                    Text(event.kind.title.uppercased())
+                        .font(Typography.display(26, weight: .semibold))
+                        .foregroundStyle(Color.amber)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let end = event.endsAt {
+                        HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                            Text(remainingString(until: end))
+                                .font(Typography.mono(28, weight: .medium))
+                                .foregroundStyle(Color.textHi)
+                                .tracking(-0.5)
+                            Text("REMAINING")
+                                .font(Typography.mono(10, weight: .semibold))
+                                .trackedUppercase(1.6)
+                                .foregroundStyle(Color.textLo)
+                        }
+                    }
+
+                    Text(timeRange(event))
+                        .font(Typography.mono(12, weight: .medium))
+                        .foregroundStyle(Color.textMid)
+                        .tracking(0.5)
+
+                    if let note = event.note {
+                        Text(note)
+                            .font(Typography.body(13))
+                            .foregroundStyle(Color.textMid)
+                            .padding(.top, Spacing.xs)
+                    }
+
+                    HStack(spacing: 4) {
+                        Spacer()
+                        Text("WHY THIS")
+                            .font(Typography.mono(10, weight: .semibold))
+                            .trackedUppercase(1.4)
+                        Text("→")
+                            .font(Typography.mono(11, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.amber)
+                    .padding(.top, Spacing.xs)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func nextCard(event: PlanEvent) -> some View {
-        InstrumentCard {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                SectionTag(
-                    text: "NEXT UP",
-                    color: .textLo,
-                    trailing: timeString(event.startsAt, tz: event.displayTimeZone)
-                )
-                Text(event.kind.title)
-                    .font(Typography.display(22, weight: .semibold))
-                    .foregroundStyle(Color.textHi)
-                HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
-                    Text(countdown(to: event.startsAt))
-                        .font(Typography.mono(20, weight: .medium))
-                        .foregroundStyle(Color.amber)
-                    Spacer()
-                    EventBadge(kind: event.kind)
-                }
-                if let note = event.note {
-                    Text(note)
-                        .font(Typography.body(13))
-                        .foregroundStyle(Color.textMid)
-                        .padding(.top, Spacing.xs)
+        Button {
+            explainingEvent = event
+        } label: {
+            InstrumentCard {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    SectionTag(
+                        text: "NEXT UP",
+                        color: Color.textLo,
+                        trailing: timeString(event.startsAt, tz: event.displayTimeZone)
+                    )
+                    Text(event.kind.title)
+                        .font(Typography.display(22, weight: .semibold))
+                        .foregroundStyle(Color.textHi)
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                        Text(countdown(to: event.startsAt))
+                            .font(Typography.mono(20, weight: .medium))
+                            .foregroundStyle(Color.amber)
+                        Spacer()
+                        EventBadge(kind: event.kind)
+                    }
+                    if let note = event.note {
+                        Text(note)
+                            .font(Typography.body(13))
+                            .foregroundStyle(Color.textMid)
+                            .padding(.top, Spacing.xs)
+                    }
+                    HStack(spacing: 4) {
+                        Spacer()
+                        Text("WHY THIS")
+                            .font(Typography.mono(10, weight: .semibold))
+                            .trackedUppercase(1.4)
+                        Text("→")
+                            .font(Typography.mono(11, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.amber)
+                    .padding(.top, Spacing.xs)
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     private var completionCard: some View {
@@ -203,7 +299,12 @@ struct NowView: View {
                                 .frame(maxHeight: .infinity)
                             VStack(spacing: 0) {
                                 ForEach(Array(upcoming.enumerated()), id: \.element.id) { idx, ev in
-                                    EventRow(event: ev)
+                                    Button {
+                                        explainingEvent = ev
+                                    } label: {
+                                        EventRow(event: ev)
+                                    }
+                                    .buttonStyle(.plain)
                                     if idx < upcoming.count - 1 {
                                         Hairline()
                                     }

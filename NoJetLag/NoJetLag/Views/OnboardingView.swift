@@ -13,6 +13,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     header
                     scheduleCard
+                    melatoninCallout
                     footnote
                     Button(action: complete) {
                         Text("CONTINUE")
@@ -23,6 +24,40 @@ struct OnboardingView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.xxl)
                 .padding(.bottom, Spacing.xl)
+            }
+        }
+    }
+
+    private var melatoninCallout: some View {
+        let country = MelatoninLegality.current
+        let status = country.status
+        return InstrumentCard {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack(spacing: Spacing.sm) {
+                    Text("MELATONIN · \(country.regionCode.isEmpty ? "REGION" : country.regionCode)")
+                        .font(Typography.mono(10, weight: .semibold))
+                        .trackedUppercase(1.6)
+                        .foregroundStyle(Color.textLo)
+                    Spacer()
+                    Text(status.label)
+                        .font(Typography.mono(9, weight: .semibold))
+                        .trackedUppercase(1.4)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .foregroundStyle(status.color)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radius.sm)
+                                .stroke(status.color, lineWidth: 1)
+                        )
+                }
+                Text(status.headline)
+                    .font(Typography.body(15, weight: .semibold))
+                    .foregroundStyle(status.color)
+                Text(status.advisory)
+                    .font(Typography.body(13))
+                    .foregroundStyle(Color.textMid)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

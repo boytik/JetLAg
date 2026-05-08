@@ -16,13 +16,49 @@ final class AppState: ObservableObject {
         didSet { save() }
     }
 
+    @Published var backgroundSound: BackgroundSound {
+        didSet {
+            AmbientPlayer.shared.play(backgroundSound)
+            save()
+        }
+    }
+
+    @Published var backgroundVolume: Double {
+        didSet {
+            AmbientPlayer.shared.volume = Float(backgroundVolume)
+            save()
+        }
+    }
+
+    @Published var feedbackHistory: [TripFeedback] {
+        didSet { save() }
+    }
+
     init(sleepSchedule: SleepSchedule = .default,
          trip: Trip? = nil,
-         hasCompletedOnboarding: Bool = false)
+         hasCompletedOnboarding: Bool = false,
+         backgroundSound: BackgroundSound = .rain,
+         backgroundVolume: Double = 0.6,
+         feedbackHistory: [TripFeedback] = [])
     {
         self.sleepSchedule = sleepSchedule
         self.trip = trip
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.backgroundSound = backgroundSound
+        self.backgroundVolume = backgroundVolume
+        self.feedbackHistory = feedbackHistory
+    }
+
+    /// True if the user has already submitted feedback for the given trip.
+    func hasFeedback(for tripId: UUID) -> Bool {
+        feedbackHistory.contains { $0.tripId == tripId }
+    }
+
+    /// Boots the ambient player to match the current state. Call once at
+    /// app launch (after `load()`).
+    func startAmbiencePlayback() {
+        AmbientPlayer.shared.volume = Float(backgroundVolume)
+        AmbientPlayer.shared.play(backgroundSound)
     }
 
     /// The full event timeline, derived from the active trip + sleep schedule.
@@ -46,10 +82,14 @@ final class AppState: ObservableObject {
 
     // MARK: - Persistence
 
+    /// Persisted shape. New fields are optional so older snapshots still decode.
     private struct Snapshot: Codable {
         var sleepSchedule: SleepSchedule
         var trip: Trip?
         var hasCompletedOnboarding: Bool
+        var backgroundSound: BackgroundSound?
+        var backgroundVolume: Double?
+        var feedbackHistory: [TripFeedback]?
     }
 
     private static var fileURL: URL {
@@ -66,7 +106,10 @@ final class AppState: ObservableObject {
         return AppState(
             sleepSchedule: snap.sleepSchedule,
             trip: snap.trip,
-            hasCompletedOnboarding: snap.hasCompletedOnboarding
+            hasCompletedOnboarding: snap.hasCompletedOnboarding,
+            backgroundSound: snap.backgroundSound ?? .rain,
+            backgroundVolume: snap.backgroundVolume ?? 0.6,
+            feedbackHistory: snap.feedbackHistory ?? []
         )
     }
 
@@ -74,7 +117,10 @@ final class AppState: ObservableObject {
         let snap = Snapshot(
             sleepSchedule: sleepSchedule,
             trip: trip,
-            hasCompletedOnboarding: hasCompletedOnboarding
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            backgroundSound: backgroundSound,
+            backgroundVolume: backgroundVolume,
+            feedbackHistory: feedbackHistory
         )
         do {
             let data = try JSONEncoder().encode(snap)

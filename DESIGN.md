@@ -130,8 +130,11 @@ Use Asset Catalog. Each color has a light + dark variant. Reference colors in co
 
 | Date | Decision | Rationale |
 | --- | --- | --- |
-| 2026-05-08 | Initial design system | Created via /design-consultation. Memorable thing: "for serious travelers." Direction: industrial / pilot-watch. Differentiates against Timeshifter (friendly-wellness), Flykitt (sunset-gradient), StopJetLag (legacy web). |
+| 2026-05-08 | Initial design system | Created via /design-consultation. Memorable thing: "for serious travelers." Direction: industrial / pilot-watch (visual language only — target user is the regular serious traveler, NOT pilots). Differentiates against Timeshifter (friendly-wellness), Flykitt (sunset-gradient), StopJetLag (legacy web). |
 | 2026-05-08 | IBM Plex over SF Pro | Plex is a designed-together institutional family with built-in technical/serious feel. Bundling adds ~600KB and slight iOS-native friction; reward is instant "this is an instrument" recognition. |
 | 2026-05-08 | Single amber accent (#FFB000) | Reads as instrument-panel "look here" warning amber. Distinct from every competitor (Timeshifter teal/orange, Flykitt sunset-pink). |
 | 2026-05-08 | Custom geometric icons over SF Symbols | SF Symbols pair tightly with SF Pro and read as "default iOS" — fights our typography. Custom 1.5px stroke icons reinforce instrument-panel feel. |
 | 2026-05-08 | 4-8pt corner radii (not 16pt) | Default iOS rounded-rect reads as "consumer soft." Smaller radii read as "engineered tool." |
+| 2026-05-08 | v0.1 scope: iPhone target only | No Apple Watch app, no Widget extension target for v0.1. Single iPhone target keeps the MVP buildable solo. Watch / Lock-Screen widgets explicitly deferred to v0.2+. |
+| 2026-05-08 | "Why this advice" pattern | Every PlanEvent is tappable and opens an `EventDetailView` sheet with: one-line summary, mechanism prose, peer-reviewed citation. Tap target shown via "WHY THIS →" affordance on Now-screen cards and full-row tap on Plan-timeline rows. Citations live in `Models/EventRationale.swift`. Adds the credibility a serious traveler needs. |
+| 2026-05-08 | Feedback collection: local + email export | v0.1 feedback strategy: store ratings on-device, ship to dedicated mailbox `feedback@nojetlag.app` via system Share Sheet / `mailto:`. No backend in v0.1. Migrate to TelemetryDeck (anonymous opt-in analytics) once feedback patterns emerge. App copy stays English-only across v0.1. |

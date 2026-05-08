@@ -22,5 +22,9 @@ struct RootView: View {
                 }
             }
         }
+        .task {
+            // Boot the ambient player once the root view is on screen.
+            state.startAmbiencePlayback()
+        }
     }
 }
