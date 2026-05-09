@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var bedtime: Date = Date()
     @State private var wake: Date    = Date()
     @State private var showingClearAlert = false
+    @State private var showingFeedbackCompose = false
 
     var body: some View {
         NavigationStack {
@@ -302,9 +303,7 @@ struct SettingsView: View {
                     Hairline()
 
                     Button {
-                        if let url = generalFeedbackURL {
-                            openURL(url)
-                        }
+                        showingFeedbackCompose = true
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -327,6 +326,21 @@ struct SettingsView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingFeedbackCompose) {
+            FeedbackComposeSheet(
+                recipient: NoJetLagContact.feedbackEmail,
+                subject: "NoJetLag — general feedback",
+                messageBody: feedbackBody
+            )
+        }
+    }
+
+    /// Pre-filled message body for the general-feedback flow.
+    private var feedbackBody: String {
+        """
+        App version: \(NoJetLagContact.appVersion) (\(NoJetLagContact.appBuild))
+
+        """
     }
 
     private var historySubtitle: String {
@@ -334,20 +348,6 @@ struct SettingsView: View {
             return "No entries yet"
         }
         return "\(state.feedbackHistory.count) trip\(state.feedbackHistory.count == 1 ? "" : "s") rated"
-    }
-
-    private var generalFeedbackURL: URL? {
-        let subject = "NoJetLag — general feedback"
-        let body = """
-        App version: \(NoJetLagContact.appVersion) (\(NoJetLagContact.appBuild))
-
-        """
-        let allowed = CharacterSet.urlQueryAllowed
-        guard
-            let s = subject.addingPercentEncoding(withAllowedCharacters: allowed),
-            let b = body.addingPercentEncoding(withAllowedCharacters: allowed)
-        else { return nil }
-        return URL(string: "mailto:\(NoJetLagContact.feedbackEmail)?subject=\(s)&body=\(b)")
     }
 
     private var importantGroup: some View {

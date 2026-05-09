@@ -113,10 +113,53 @@ struct PlanView: View {
     private var timelineMode: some View {
         let groups = groupedByDay(state.plan)
         return VStack(alignment: .leading, spacing: Spacing.lg) {
-            ForEach(groups, id: \.id) { group in
+            ForEach(Array(groups.enumerated()), id: \.element.id) { idx, group in
+                if shouldShowLegBanner(at: idx, in: groups) {
+                    legBanner(group.leg)
+                }
                 daySection(title: group.dayTitle, tzAbbr: group.tzAbbr, events: group.events)
             }
         }
+    }
+
+    private func shouldShowLegBanner(at idx: Int, in groups: [DayGroup]) -> Bool {
+        guard let leg = groups[idx].leg else { return false }
+        if idx == 0 { return true }
+        return groups[idx - 1].leg != leg
+    }
+
+    private func legBanner(_ leg: Leg?) -> some View {
+        let label: String = {
+            switch leg {
+            case .outbound: return "OUTBOUND · TO DESTINATION"
+            case .returning: return "RETURN · BACK HOME"
+            case .none: return ""
+            }
+        }()
+        return HStack(spacing: Spacing.sm) {
+            Rectangle()
+                .fill(Color.amber)
+                .frame(width: 2, height: 18)
+            Text(label)
+                .font(Typography.mono(11, weight: .semibold))
+                .trackedUppercase(1.6)
+                .foregroundStyle(Color.amber)
+            Spacer()
+        }
+        .padding(.top, Spacing.sm)
+    }
+
+    // Used to label OUTBOUND vs RETURN legs in round trips.
+    private enum Leg: Equatable {
+        case outbound
+        case returning
+    }
+
+    private func leg(forEventStart start: Date) -> Leg? {
+        guard let trip = state.trip, trip.isRoundTrip,
+              let returnDep = trip.returnDeparture
+        else { return nil }
+        return start < returnDep ? .outbound : .returning
     }
 
     // MARK: - Calendar mode
@@ -438,6 +481,7 @@ struct PlanView: View {
         let dayTitle: String
         let tzAbbr: String
         let events: [PlanEvent]
+        let leg: Leg?
     }
 
     private func groupedByDay(_ events: [PlanEvent]) -> [DayGroup] {
@@ -466,7 +510,8 @@ struct PlanView: View {
                 id: bucket.key,
                 dayTitle: "DAY \(String(format: "%02d", idx + 1)) · \(bucket.dayTitle.uppercased())",
                 tzAbbr: bucket.tzAbbr,
-                events: bucket.events
+                events: bucket.events,
+                leg: leg(forEventStart: bucket.sort)
             )
         }
     }

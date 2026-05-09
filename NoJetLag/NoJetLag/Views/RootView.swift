@@ -19,10 +19,6 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: state.hasSeenAdaptyOnboarding)
         .animation(.easeInOut(duration: 0.25), value: state.hasSetSleepSchedule)
-        .task {
-            // Boot the ambient player once the root view is on screen.
-            state.startAmbiencePlayback()
-        }
     }
 
     @ViewBuilder
@@ -51,6 +47,13 @@ struct RootView: View {
                 .tabItem { Label("PLAN", systemImage: "calendar") }
             SettingsView()
                 .tabItem { Label("SETTINGS", systemImage: "gearshape") }
+        }
+        // Boot the ambient player only once both gates have passed and the
+        // tab bar appears — keeps the onboarding/disclaimer screens silent.
+        // Also prompt for push permission here, the first time only.
+        .task {
+            state.startAmbiencePlayback()
+            await NoJetLagAppDelegate.requestPushAuthorizationIfNeeded()
         }
     }
 }

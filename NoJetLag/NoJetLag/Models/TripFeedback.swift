@@ -81,7 +81,7 @@ extension TripFeedback {
 
 /// App-wide constants for reaching the developer.
 enum NoJetLagContact {
-    static let feedbackEmail = "feedback@nojetlag.app"
+    static let feedbackEmail = "manuelwentz11@icloud.com"
     static let appVersion = "0.1"
     static let appBuild = "MVP"
 }

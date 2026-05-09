@@ -10,6 +10,10 @@ struct NewTripView: View {
     @State private var departure: Date       = defaultDeparture()
     @State private var arrival: Date         = defaultArrival()
 
+    @State private var isRoundTrip: Bool     = false
+    @State private var returnDeparture: Date = defaultReturnDeparture()
+    @State private var returnArrival: Date   = defaultReturnArrival()
+
     @State private var showingOriginPicker = false
     @State private var showingDestPicker   = false
 
@@ -21,6 +25,11 @@ struct NewTripView: View {
                     VStack(alignment: .leading, spacing: Spacing.lg) {
                         routeGroup
                         scheduleGroup
+                        roundTripGroup
+                        if isRoundTrip {
+                            returnScheduleGroup
+                            strategyGroup
+                        }
                         if let preview = shiftPreview {
                             directionGroup(preview)
                         }
@@ -40,9 +49,9 @@ struct NewTripView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("SAVE", action: save)
-                        .disabled(originTZ == destinationTZ)
+                        .disabled(!isFormValid)
                         .font(Typography.mono(11, weight: .semibold))
-                        .foregroundStyle(originTZ == destinationTZ ? Color.textLo : Color.amber)
+                        .foregroundStyle(isFormValid ? Color.amber : Color.textLo)
                 }
             }
             .sheet(isPresented: $showingOriginPicker) {
@@ -108,6 +117,117 @@ struct NewTripView: View {
                     .padding(.vertical, Spacing.md)
                 }
             }
+        }
+    }
+
+    private var roundTripGroup: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "TRIP TYPE")
+                .padding(.horizontal, Spacing.xs)
+            InstrumentCard(padding: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Round trip")
+                            .font(Typography.body(15, weight: .medium))
+                            .foregroundStyle(Color.textHi)
+                        Text("Plan the return leg too")
+                            .font(Typography.mono(11))
+                            .foregroundStyle(Color.textLo)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $isRoundTrip)
+                        .labelsHidden()
+                        .tint(Color.amber)
+                }
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.md)
+            }
+        }
+    }
+
+    private var returnScheduleGroup: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "RETURN")
+                .padding(.horizontal, Spacing.xs)
+            InstrumentCard(padding: 0) {
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Departure")
+                            .font(Typography.body(15, weight: .medium))
+                            .foregroundStyle(Color.textHi)
+                        Spacer()
+                        DatePicker("", selection: $returnDeparture, in: arrival...)
+                            .labelsHidden()
+                            .tint(Color.amber)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                    Hairline()
+                    HStack {
+                        Text("Arrival")
+                            .font(Typography.body(15, weight: .medium))
+                            .foregroundStyle(Color.textHi)
+                        Spacer()
+                        DatePicker("", selection: $returnArrival, in: returnDeparture...)
+                            .labelsHidden()
+                            .tint(Color.amber)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                }
+            }
+        }
+    }
+
+    /// Shows whether the planner will use full / partial / stay-anchored shift
+    /// based on the entered round-trip duration.
+    private var strategyGroup: some View {
+        let trial = trialTrip
+        let strategy = trial.shiftStrategy
+        let days = trial.daysAtDestination ?? 0
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
+            SectionTag(text: "STRATEGY")
+                .padding(.horizontal, Spacing.xs)
+            InstrumentCard {
+                HStack(spacing: Spacing.md) {
+                    Text(strategyCode(strategy))
+                        .font(Typography.mono(13, weight: .semibold))
+                        .trackedUppercase(1.4)
+                        .foregroundStyle(strategyTint(strategy))
+                    Text(strategyText(strategy, days: days))
+                        .font(Typography.body(13))
+                        .foregroundStyle(Color.textMid)
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func strategyCode(_ s: Trip.ShiftStrategy) -> String {
+        switch s {
+        case .stayAnchored:        return "STAY-ANCHORED"
+        case .partial(let h):
+            return String(format: "PARTIAL · %.1fH", h)
+        case .full:                return "FULL SHIFT"
+        }
+    }
+
+    private func strategyTint(_ s: Trip.ShiftStrategy) -> Color {
+        switch s {
+        case .stayAnchored: return .caffeineGreen
+        case .partial:      return .sleepIndigo
+        case .full:         return .amber
+        }
+    }
+
+    private func strategyText(_ s: Trip.ShiftStrategy, days: Int) -> String {
+        switch s {
+        case .stayAnchored:
+            return "Short trip (\(days) day\(days == 1 ? "" : "s")) — keeping home schedule costs less than a round-trip shift."
+        case .partial:
+            return "Mid-length trip (\(days) days) — partial shift, not full local-aligned."
+        case .full:
+            return "Long trip (\(days) days) — full shift to destination, full shift back."
         }
     }
 
@@ -206,6 +326,35 @@ struct NewTripView: View {
         destinationTZ = t.destinationTimeZoneId
         departure     = t.departure
         arrival       = t.arrival
+        if let returnDep = t.returnDeparture, let returnArr = t.returnArrival {
+            isRoundTrip     = true
+            returnDeparture = returnDep
+            returnArrival   = returnArr
+        }
+    }
+
+    private var isFormValid: Bool {
+        guard originTZ != destinationTZ else { return false }
+        guard arrival > departure else { return false }
+        if isRoundTrip {
+            guard returnDeparture > arrival, returnArrival > returnDeparture else { return false }
+        }
+        return true
+    }
+
+    /// Builds a Trip from current form state without committing — used by the
+    /// strategy preview to compute shift mode reactively.
+    private var trialTrip: Trip {
+        Trip(
+            id: state.trip?.id ?? UUID(),
+            name: Trip.defaultName(for: originTZ, destination: destinationTZ),
+            originTimeZoneId: originTZ,
+            destinationTimeZoneId: destinationTZ,
+            departure: departure,
+            arrival: arrival,
+            returnDeparture: isRoundTrip ? returnDeparture : nil,
+            returnArrival:   isRoundTrip ? returnArrival   : nil
+        )
     }
 
     private func save() {
@@ -215,7 +364,9 @@ struct NewTripView: View {
             originTimeZoneId: originTZ,
             destinationTimeZoneId: destinationTZ,
             departure: departure,
-            arrival: arrival
+            arrival: arrival,
+            returnDeparture: isRoundTrip ? returnDeparture : nil,
+            returnArrival:   isRoundTrip ? returnArrival   : nil
         )
         state.trip = trip
         dismiss()
@@ -227,5 +378,14 @@ struct NewTripView: View {
 
     private static func defaultArrival() -> Date {
         Calendar.current.date(byAdding: .hour, value: 10, to: defaultDeparture()) ?? Date()
+    }
+
+    private static func defaultReturnDeparture() -> Date {
+        // 7 days after the default arrival.
+        Calendar.current.date(byAdding: .day, value: 7, to: defaultArrival()) ?? Date()
+    }
+
+    private static func defaultReturnArrival() -> Date {
+        Calendar.current.date(byAdding: .hour, value: 10, to: defaultReturnDeparture()) ?? Date()
     }
 }

@@ -1,27 +1,47 @@
 import SwiftUI
 import UIKit
+import Adapty
+import AdaptyUI
 
 @main
 struct NoJetLagApp: App {
+    @UIApplicationDelegateAdaptor(NoJetLagAppDelegate.self) private var appDelegate
     @StateObject private var state = AppState.load()
+
+    /// Public live SDK key for Adapty. Safe to embed in client code.
+    static let adaptyPublicKey = "public_live_MTeM1tRN.XtRSQnI7XEkKAW4lGHgT"
+
+    /// Adapty placement ID for the onboarding configured in the dashboard.
+    static let adaptyOnboardingPlacementId = "Important"
+
+    /// Single shared activation Task — runs `Adapty.activate(with:)` and
+    /// then `AdaptyUI.activate()` exactly once. Anyone who needs the SDK
+    /// ready awaits `.value` on this Task. Initialised lazily on first
+    /// access; we touch it from `init()` to start activation immediately.
+    static let adaptyActivation: Task<Void, Error> = {
+        // Capture the MainActor-isolated key here, in the outer closure
+        // which runs at static-init time on MainActor. This avoids the
+        // "Expression is 'async' but is not marked with 'await'" warning
+        // we'd hit if we read `adaptyPublicKey` directly inside the
+        // non-isolated `Task { }` body.
+        let key = adaptyPublicKey
+        return Task {
+            let configuration = AdaptyConfiguration
+                .builder(withAPIKey: key)
+                .build()
+            try await Adapty.activate(with: configuration)
+            // AdaptyUI requires its own activation step in addition to
+            // Adapty.activate — without this the onboarding view config
+            // request fails with `AdaptyUIErrorDomain 4002`. In recent
+            // SDK versions this call is async.
+            try await AdaptyUI.activate()
+        }
+    }()
 
     init() {
         Self.configureAppearance()
-        Self.activateAdaptyIfPossible()
-    }
-
-    /// One-shot Adapty SDK activation. Call this BEFORE any view tries to
-    /// fetch onboarding/paywall content.
-    ///
-    /// **TODO(adapty):** once AdaptySDK is imported in this target:
-    ///   1. Add `import Adapty` and `import AdaptyUI` at the top of this file.
-    ///   2. Replace the body below with:
-    ///         Adapty.activate("YOUR_PUBLIC_SDK_KEY")
-    ///         AdaptyUI.activate()
-    ///   3. (Optional) set `AdaptyUI.delegate = …` if you need analytics hooks.
-    private static func activateAdaptyIfPossible() {
-        // Placeholder — no-op. The AdaptyOnboardingHost shows a stub until
-        // this is wired.
+        // Kick off the lazy activation Task right away.
+        _ = Self.adaptyActivation
     }
 
     var body: some Scene {

@@ -32,6 +32,23 @@ final class NetworkMonitor: ObservableObject {
         monitor.start(queue: queue)
     }
 
+    /// Force a synchronous re-evaluation of the current network path.
+    /// `NWPathMonitor` already pushes updates automatically, but a manual
+    /// recheck is useful behind a "Try again" button — it gives the user
+    /// agency on flaky networks where the monitor may have missed a flap.
+    func recheck() {
+        let online = monitor.currentPath.status == .satisfied
+        DispatchQueue.main.async {
+            if self.isOnline != online {
+                self.isOnline = online
+            } else {
+                // Trigger objectWillChange so the view re-renders even when
+                // the value didn't change — gives visual feedback on the tap.
+                self.objectWillChange.send()
+            }
+        }
+    }
+
     deinit {
         monitor.cancel()
     }

@@ -4,8 +4,8 @@ import SwiftUI
 /// to expand its full details inline.
 struct HistoryView: View {
     @EnvironmentObject private var state: AppState
-    @Environment(\.openURL) private var openURL
     @State private var expandedId: UUID?
+    @State private var composing: TripFeedback?
 
     private var entries: [TripFeedback] {
         state.feedbackHistory.sorted { $0.createdAt > $1.createdAt }
@@ -34,6 +34,13 @@ struct HistoryView: View {
         }
         .navigationTitle("HISTORY")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $composing) { entry in
+            FeedbackComposeSheet(
+                recipient: NoJetLagContact.feedbackEmail,
+                subject: "NoJetLag feedback — \(entry.routeShortText)",
+                messageBody: composeEmailBody(fb: entry)
+            )
+        }
     }
 
     // MARK: Pieces
@@ -109,9 +116,7 @@ struct HistoryView: View {
                     .foregroundStyle(Color.textLo)
                 Spacer()
                 Button {
-                    if let url = mailtoURL(for: entry) {
-                        openURL(url)
-                    }
+                    composing = entry
                 } label: {
                     HStack(spacing: 4) {
                         Text("RE-SEND VIA EMAIL")
@@ -180,17 +185,6 @@ struct HistoryView: View {
         let f = DateFormatter()
         f.dateFormat = "dd MMM · HH:mm"
         return f.string(from: date).uppercased()
-    }
-
-    private func mailtoURL(for fb: TripFeedback) -> URL? {
-        let subject = "NoJetLag feedback — \(fb.routeShortText)"
-        let body = composeEmailBody(fb: fb)
-        let allowed = CharacterSet.urlQueryAllowed
-        guard
-            let encSub = subject.addingPercentEncoding(withAllowedCharacters: allowed),
-            let encBody = body.addingPercentEncoding(withAllowedCharacters: allowed)
-        else { return nil }
-        return URL(string: "mailto:\(NoJetLagContact.feedbackEmail)?subject=\(encSub)&body=\(encBody)")
     }
 
     private func composeEmailBody(fb: TripFeedback) -> String {

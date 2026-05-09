@@ -5,13 +5,13 @@ import SwiftUI
 struct FeedbackEntryView: View {
     let trip: Trip
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var state: AppState
 
     @State private var sleepDay1: Int = 3
     @State private var manageability: Int = 3
     @State private var overall: Int = 3
     @State private var comments: String = ""
+    @State private var composing: TripFeedback?
 
     var body: some View {
         NavigationStack {
@@ -54,6 +54,13 @@ struct FeedbackEntryView: View {
                         .font(Typography.mono(11, weight: .semibold))
                         .foregroundStyle(Color.textLo)
                 }
+            }
+            .sheet(item: $composing, onDismiss: { dismiss() }) { fb in
+                FeedbackComposeSheet(
+                    recipient: NoJetLagContact.feedbackEmail,
+                    subject: "NoJetLag feedback — \(fb.routeShortText)",
+                    messageBody: composeEmailBody(fb: fb)
+                )
             }
         }
     }
@@ -186,10 +193,9 @@ struct FeedbackEntryView: View {
 
     private func saveAndShare() {
         let fb = persist()
-        if let url = mailtoURL(for: fb) {
-            openURL(url)
-        }
-        dismiss()
+        // Triggers the .sheet(item:) above, which dismisses this view
+        // via onDismiss when the compose sheet closes.
+        composing = fb
     }
 
     private func saveOnly() {
@@ -208,20 +214,6 @@ struct FeedbackEntryView: View {
         )
         state.feedbackHistory.append(fb)
         return fb
-    }
-
-    private func mailtoURL(for fb: TripFeedback) -> URL? {
-        let subject = "NoJetLag feedback — \(fb.routeShortText)"
-        let body = composeEmailBody(fb: fb)
-        let allowed = CharacterSet.urlQueryAllowed
-        guard
-            let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: allowed),
-            let encodedBody = body.addingPercentEncoding(withAllowedCharacters: allowed)
-        else {
-            return nil
-        }
-        let urlString = "mailto:\(NoJetLagContact.feedbackEmail)?subject=\(encodedSubject)&body=\(encodedBody)"
-        return URL(string: urlString)
     }
 
     private func composeEmailBody(fb: TripFeedback) -> String {

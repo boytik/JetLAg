@@ -321,31 +321,67 @@ struct NowView: View {
     // MARK: Empty state
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Spacer()
-            VStack(spacing: Spacing.sm) {
-                Text("NO ACTIVE TRIP")
-                    .font(Typography.mono(11, weight: .semibold))
-                    .trackedUppercase(1.6)
-                    .foregroundStyle(Color.textLo)
-                Text("Add your flight to begin the protocol.")
-                    .font(Typography.body(15))
-                    .foregroundStyle(Color.textMid)
-                    .multilineTextAlignment(.center)
-            }
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                VStack(spacing: Spacing.sm) {
+                    Text("NO ACTIVE TRIP")
+                        .font(Typography.mono(11, weight: .semibold))
+                        .trackedUppercase(1.6)
+                        .foregroundStyle(Color.textLo)
+                    Text("Add your flight to begin the protocol.")
+                        .font(Typography.body(15))
+                        .foregroundStyle(Color.textMid)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, Spacing.xxl)
+                .padding(.bottom, Spacing.sm)
 
-            Button {
-                showingNewTrip = true
-            } label: {
-                Text("PLAN A TRIP")
-                    .trackedUppercase(1.4)
+                howItWorksCard
+
+                Button {
+                    showingNewTrip = true
+                } label: {
+                    Text("PLAN A TRIP")
+                        .trackedUppercase(1.4)
+                }
+                .buttonStyle(.instrument)
+                .padding(.top, Spacing.sm)
             }
-            .buttonStyle(.instrument)
-            .padding(.horizontal, Spacing.xxl)
-            Spacer()
+            .padding(.horizontal, Spacing.lg)
+            .padding(.bottom, Spacing.xxl)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(Spacing.lg)
+    }
+
+    private var howItWorksCard: some View {
+        InstrumentCard {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                SectionTag(text: "HOW IT WORKS")
+                VStack(alignment: .leading, spacing: 0) {
+                    stepRow(number: "01", text: "Add your flight — origin, destination, departure & arrival times.")
+                    Hairline().padding(.vertical, Spacing.sm)
+                    stepRow(number: "02", text: "We build your personal circadian shift: light, sleep, melatonin, caffeine windows.")
+                    Hairline().padding(.vertical, Spacing.sm)
+                    stepRow(number: "03", text: "Follow the day-by-day plan, starting two days before takeoff.")
+                    Hairline().padding(.vertical, Spacing.sm)
+                    stepRow(number: "04", text: "Share feedback in Settings — your trips help us tune the algorithm.")
+                }
+            }
+        }
+    }
+
+    private func stepRow(number: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: Spacing.md) {
+            Text(number)
+                .font(Typography.mono(13, weight: .semibold))
+                .foregroundStyle(Color.amber)
+                .frame(width: 24, alignment: .leading)
+            Text(text)
+                .font(Typography.body(14))
+                .foregroundStyle(Color.textMid)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(2)
+            Spacer(minLength: 0)
+        }
     }
 
     // MARK: Nav-status accessory

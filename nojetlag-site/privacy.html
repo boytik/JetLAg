@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — NoJetLag</title>
+<meta name="description" content="NoJetLag's privacy policy. Trip details and sleep schedule stay on your device. No account, no advertising, no analytics beyond the paywall provider.">
+<meta name="theme-color" content="#0E1116">
+<style>
+  :root{
+    --bg-0:#0E1116;
+    --bg-1:#161A22;
+    --stroke:#2A2F36;
+    --stroke-strong:#3A4049;
+    --text-hi:#ECECEC;
+    --text-mid:#B7BCC4;
+    --text-lo:#8A8F98;
+    --amber:#FFB000;
+    --r-sm:4px;
+    --r-md:8px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"IBM Plex Sans","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;
+    color:var(--text-hi);background:var(--bg-0);line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--amber);text-decoration:none}
+  a:hover{color:#fff;text-decoration:underline}
+
+  .grid{
+    position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.25;
+    background-image:radial-gradient(circle, var(--stroke) 1px, transparent 1px);
+    background-size:24px 24px;
+    mask-image:radial-gradient(ellipse at 50% 30%, black 0%, transparent 75%);
+    -webkit-mask-image:radial-gradient(ellipse at 50% 30%, black 0%, transparent 75%);
+  }
+  .glow{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(700px 500px at 90% -10%, rgba(255,176,0,.05), transparent 60%);
+  }
+
+  header,main,footer{position:relative;z-index:1}
+
+  .mono{
+    font-family:"IBM Plex Mono","SF Mono","JetBrains Mono",ui-monospace,"Menlo","Consolas",monospace;
+    font-feature-settings:"tnum" 1;
+  }
+
+  header{
+    max-width:760px;margin:0 auto;padding:28px 24px 0;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.4px;color:var(--text-hi)}
+  .brand-mark{
+    position:relative;width:26px;height:26px;
+    border:1.5px solid var(--amber);border-radius:50%;
+    flex-shrink:0;
+  }
+  .brand-mark::before,.brand-mark::after{content:"";position:absolute;background:var(--amber)}
+  .brand-mark::before{left:50%;top:-3px;bottom:-3px;width:1.5px;transform:translateX(-50%)}
+  .brand-mark::after{top:50%;left:-3px;right:-3px;height:1.5px;transform:translateY(-50%)}
+
+  nav a{
+    margin-left:20px;color:var(--text-lo);font-size:13px;
+    letter-spacing:1px;text-transform:uppercase;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  nav a:hover{color:var(--amber)}
+
+  main{
+    max-width:760px;margin:0 auto;padding:48px 24px 24px;
+  }
+  .tag{
+    display:inline-block;font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+    color:var(--amber);margin-bottom:18px;
+    padding:5px 10px;border:1px solid var(--stroke);border-radius:var(--r-sm);
+    background:rgba(255,176,0,.04);
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  h1{
+    font-family:"IBM Plex Sans Condensed","SF Pro Display",-apple-system,sans-serif;
+    font-weight:600;
+    font-size:clamp(34px,5vw,52px);
+    line-height:1.1;letter-spacing:-.02em;margin:0 0 12px;color:var(--text-hi);
+  }
+  .last-updated{
+    color:var(--text-lo);font-size:13px;margin:0 0 32px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    letter-spacing:.5px;
+  }
+  .summary{
+    margin:0 0 36px;padding:22px 24px;border-radius:var(--r-md);
+    border:1px solid var(--amber);background:rgba(255,176,0,.03);
+    color:var(--text-mid);font-size:15.5px;
+    position:relative;
+  }
+  .summary::before{
+    content:"";position:absolute;left:0;top:18px;bottom:18px;width:3px;
+    background:var(--amber);
+  }
+  .summary strong{color:var(--amber);font-weight:600}
+  h2{
+    font-family:"IBM Plex Sans Condensed","SF Pro Display",-apple-system,sans-serif;
+    font-size:22px;letter-spacing:-.005em;font-weight:600;
+    margin:40px 0 12px;color:var(--text-hi);
+  }
+  p,ul{font-size:16px;color:var(--text-mid);margin:0 0 14px}
+  ul{padding-left:22px}
+  ul li{margin-bottom:6px}
+  .highlight{
+    color:var(--text-hi);background:rgba(255,176,0,.12);
+    padding:1px 6px;border-radius:var(--r-sm);
+  }
+  code{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    background:var(--bg-1);border:1px solid var(--stroke);
+    padding:1px 6px;border-radius:var(--r-sm);font-size:13.5px;
+    color:var(--text-hi);
+  }
+
+  footer{
+    max-width:760px;margin:60px auto 0;padding:28px 24px 36px;
+    border-top:1px solid var(--stroke);color:var(--text-lo);font-size:13px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  footer nav a{margin-left:0;margin-right:18px}
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+<div class="grid" aria-hidden="true"></div>
+
+<header>
+  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span> NoJetLag</a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="support.html">Support</a>
+  </nav>
+</header>
+
+<main>
+  <span class="tag">Legal · Privacy</span>
+  <h1>Privacy Policy</h1>
+  <p class="last-updated">LAST UPDATED · MAY 9, 2026</p>
+
+  <div class="summary">
+    <strong>The short version.</strong> NoJetLag does not require an account. Your flight details, sleep schedule, and feedback are stored only on your iPhone. The day-by-day plan is computed locally. The only third party that briefly touches data is Adapty, our paywall provider, which receives an anonymous device identifier — never linked to who you are.
+  </div>
+
+  <h2>1. What we collect</h2>
+  <p>We do <strong>not</strong> collect personal data on our servers. Specifically:</p>
+  <ul>
+    <li>Your flight details, bedtime, wake time, and trip feedback are stored <span class="highlight">only on your device</span>, in app storage (a JSON file in the Documents directory).</li>
+    <li>We do not collect your name, email, phone number, or Apple ID.</li>
+    <li>We do not collect health data, location, contacts, calendar, microphone, or camera input.</li>
+  </ul>
+
+  <h2>2. On-device computation</h2>
+  <p>The day-by-day light, sleep, and melatonin schedule is computed entirely on your iPhone from the flight you enter. No flight data, no sleep schedule, no feedback is transmitted to our servers or to any third party.</p>
+
+  <h2>3. Third-party services</h2>
+  <p>NoJetLag relies on one third party to deliver the first-launch onboarding screens and to manage subscription state:</p>
+  <ul>
+    <li><strong>Adapty</strong> (onboarding flow and subscription management) — <a href="https://adapty.io/privacy/" target="_blank" rel="noopener">https://adapty.io/privacy/</a><br>
+    Adapty receives an anonymous device identifier and onboarding-event analytics in order to render the onboarding screens and manage subscription state. Adapty does not receive your trip details, your sleep schedule, or any health-relevant data. The first launch requires an internet connection so Adapty can deliver the onboarding; after that, the app works fully offline.</li>
+  </ul>
+
+  <h2>4. What we do <em>not</em> do</h2>
+  <ul>
+    <li>No accounts, no sign-up, no email, no password.</li>
+    <li>No advertising, no ad networks, no ad-attribution SDKs.</li>
+    <li>No general-purpose analytics or telemetry. The Adapty SDK is configured for paywall and onboarding events only.</li>
+    <li>No selling, sharing, or licensing of any user data to anyone, ever.</li>
+  </ul>
+
+  <h2>5. Children's privacy</h2>
+  <p>NoJetLag is not intended for users under 12 years of age. We do not knowingly collect personal information from children. If a parent or guardian believes that a child has used NoJetLag in a way they object to, please contact us at <a href="mailto:boytik@actvox.dev">boytik@actvox.dev</a> and we will respond as quickly as we can.</p>
+
+  <h2>6. Your rights</h2>
+  <p>Because we do not associate any data with an identifiable person, there is no personal account on our side to access, export, or delete. The data the app stores about you lives on your device, and you control it directly:</p>
+  <ul>
+    <li>To clear your trip and start over, use the in-app <em>Settings → Trip → Clear current trip</em> action.</li>
+    <li>To wipe everything, uninstall NoJetLag from your iPhone — local data is removed when the app is removed.</li>
+  </ul>
+
+  <h2>7. Security</h2>
+  <p>All network traffic between NoJetLag and Adapty is protected by standard TLS (HTTPS). We do not implement custom cryptography, and the app declares <code>ITSAppUsesNonExemptEncryption = false</code> in its Info.plist.</p>
+
+  <h2>8. Changes to this policy</h2>
+  <p>If we change this policy, we will update the date at the top of this page and, if the change is material, we will mention it inside the app. Continuing to use NoJetLag after a change means you accept the updated policy.</p>
+
+  <h2>9. Disclaimer</h2>
+  <p>NoJetLag is general guidance based on circadian-rhythm research. It is not medical advice and not a medical device. Recommendations do not constitute medical, legal, financial, or psychological advice. Melatonin availability and legal dose vary by country — consult a qualified healthcare professional before starting any melatonin protocol, particularly if you take prescription medication, are pregnant or breastfeeding, are under 18, or have a sleep, mood, or autoimmune condition.</p>
+
+  <h2>10. Contact</h2>
+  <p>Questions, concerns, or just want to say hi? Email <a href="mailto:boytik@actvox.dev">boytik@actvox.dev</a>. We read everything.</p>
+</main>
+
+<footer>
+  <div>© 2026 NoJetLag · Land sharp.</div>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="support.html">Support</a>
+    <a href="mailto:boytik@actvox.dev">Contact</a>
+  </nav>
+</footer>
+</body>
+</html>

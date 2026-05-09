@@ -1,0 +1,79 @@
+workflows:
+  ios-stellara:
+    name: Stellara iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    integrations:
+      # Имя интеграции, которую ты создашь в Codemagic Team Settings -> Integrations -> App Store Connect.
+      # Должно совпадать с тем, что введёшь там. Рекомендую: stellara_asc
+      app_store_connect: stellara_asc
+
+    environment:
+      vars:
+        BUNDLE_ID: "com.codybuen.magicBall"
+        XCODE_PROJECT: "Stellara/Stellara.xcodeproj"
+        XCODE_SCHEME: "Stellara"
+        APP_STORE_APPLE_ID: 6766813871
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Initialize keychain
+        script: |
+          keychain initialize
+
+      - name: Generate certificate private key and fetch signing files
+        script: |
+          # Генерируем новый RSA-ключ для distribution-сертификата.
+          # Codemagic потом отправит соответствующий CSR в Apple,
+          # получит подписанный сертификат и сохранит .p12 в keychain.
+          ssh-keygen -t rsa -b 2048 -m PEM -f $HOME/cert_key.pem -q -N ""
+
+          # Создаёт distribution-сертификат + App Store provisioning profile.
+          # Если уже есть — скачает; если нет — создаст в Apple Dev Portal.
+          # Синтаксис @file: говорит CLI прочитать значение из файла.
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@file:$HOME/cert_key.pem \
+            --create
+
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+
+      - name: Apply provisioning profiles to Xcode project
+        script: |
+          cd $CM_BUILD_DIR/Stellara
+          xcode-project use-profiles
+
+      - name: Increment build number
+        script: |
+          #!/bin/sh
+          cd $CM_BUILD_DIR/Stellara
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+
+      - name: Build ipa for distribution
+        script: |
+          cd $CM_BUILD_DIR
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        # На первом билде НЕ сабмитим в App Review автоматически — сначала смотрим в TestFlight.
+        # Когда будешь готов реально релизиться, переключишь в true.
+        submit_to_app_store: false
+        # Билд автоматически уйдёт в TestFlight всем внутренним тестерам.
+        # Если хочешь конкретные группы — раскомментируй и впиши имена.
+        # beta_groups:
+        #   - "Internal testers"

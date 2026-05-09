@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Support — NoJetLag</title>
+<meta name="description" content="Get help with NoJetLag. FAQ on circadian shift, melatonin, round trips, offline onboarding, troubleshooting.">
+<meta name="theme-color" content="#0E1116">
+<style>
+  :root{
+    --bg-0:#0E1116;
+    --bg-1:#161A22;
+    --bg-2:#1D222C;
+    --stroke:#2A2F36;
+    --stroke-strong:#3A4049;
+    --text-hi:#ECECEC;
+    --text-mid:#B7BCC4;
+    --text-lo:#8A8F98;
+    --amber:#FFB000;
+    --indigo:#5E6AD2;
+    --green:#46A758;
+    --r-sm:4px;
+    --r-md:8px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"IBM Plex Sans","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;
+    color:var(--text-hi);background:var(--bg-0);line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--amber);text-decoration:none}
+  a:hover{color:#fff;text-decoration:underline}
+
+  /* Same dot-grid + amber edge glow as the rest of the site */
+  .grid{
+    position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.25;
+    background-image:radial-gradient(circle, var(--stroke) 1px, transparent 1px);
+    background-size:24px 24px;
+    mask-image:radial-gradient(ellipse at 50% 30%, black 0%, transparent 75%);
+    -webkit-mask-image:radial-gradient(ellipse at 50% 30%, black 0%, transparent 75%);
+  }
+  .glow{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(700px 500px at 90% -10%, rgba(255,176,0,.05), transparent 60%);
+  }
+
+  header,main,footer{position:relative;z-index:1}
+
+  .mono{
+    font-family:"IBM Plex Mono","SF Mono","JetBrains Mono",ui-monospace,"Menlo","Consolas",monospace;
+    font-feature-settings:"tnum" 1;
+  }
+
+  /* ─── Header (matches privacy.html) ─────────────────────────────────── */
+  header{
+    max-width:780px;margin:0 auto;padding:28px 24px 0;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.4px;color:var(--text-hi)}
+  .brand-mark{
+    position:relative;width:26px;height:26px;
+    border:1.5px solid var(--amber);border-radius:50%;
+    flex-shrink:0;
+  }
+  .brand-mark::before,.brand-mark::after{content:"";position:absolute;background:var(--amber)}
+  .brand-mark::before{left:50%;top:-3px;bottom:-3px;width:1.5px;transform:translateX(-50%)}
+  .brand-mark::after{top:50%;left:-3px;right:-3px;height:1.5px;transform:translateY(-50%)}
+  nav a{
+    margin-left:20px;color:var(--text-lo);font-size:13px;
+    letter-spacing:1px;text-transform:uppercase;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  nav a:hover{color:var(--amber)}
+
+  main{max-width:780px;margin:0 auto;padding:48px 24px 24px}
+
+  .tag{
+    display:inline-block;font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+    color:var(--amber);margin-bottom:18px;
+    padding:5px 10px;border:1px solid var(--stroke);border-radius:var(--r-sm);
+    background:rgba(255,176,0,.04);
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+
+  h1{
+    font-family:"IBM Plex Sans Condensed","SF Pro Display",-apple-system,sans-serif;
+    font-weight:600;
+    font-size:clamp(34px,5vw,52px);
+    line-height:1.1;letter-spacing:-.02em;margin:0 0 12px;color:var(--text-hi);
+    font-stretch:condensed;
+  }
+  .lede{color:var(--text-mid);font-size:16px;margin:0 0 36px;max-width:600px}
+
+  /* ─── Contact card ──────────────────────────────────────────────────── */
+  .contact-card{
+    margin:0 0 40px;padding:22px 24px;border-radius:var(--r-md);
+    border:1px solid var(--amber);background:rgba(255,176,0,.03);
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    position:relative;
+  }
+  .contact-card::before{
+    content:"";position:absolute;left:0;top:18px;bottom:18px;width:3px;background:var(--amber);
+  }
+  .contact-card .label{
+    color:var(--text-lo);font-size:11px;letter-spacing:1.6px;text-transform:uppercase;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  .contact-card .email{
+    font-size:18px;font-weight:600;color:var(--text-hi);margin-top:4px;display:block;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+
+  .btn{
+    display:inline-block;padding:11px 20px;
+    border-radius:var(--r-md);font-weight:600;font-size:13px;
+    border:1px solid var(--amber);background:var(--amber);color:var(--bg-0);
+    text-transform:uppercase;letter-spacing:1.4px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    transition:opacity .2s ease;
+  }
+  .btn:hover{color:var(--bg-0);opacity:.85;text-decoration:none}
+
+  /* ─── Section headers ───────────────────────────────────────────────── */
+  h2{
+    font-family:"IBM Plex Sans Condensed","SF Pro Display",-apple-system,sans-serif;
+    font-size:24px;letter-spacing:-.005em;font-weight:600;
+    margin:48px 0 16px;color:var(--text-hi);
+  }
+  p,ul{font-size:16px;color:var(--text-mid);margin:0 0 14px}
+  ul{padding-left:22px}
+  ul li{margin-bottom:6px}
+  code{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    background:var(--bg-1);border:1px solid var(--stroke);
+    padding:1px 6px;border-radius:var(--r-sm);font-size:13.5px;
+    color:var(--text-hi);
+  }
+
+  /* ─── FAQ accordion ─────────────────────────────────────────────────── */
+  details{
+    border:1px solid var(--stroke);background:var(--bg-1);
+    border-radius:var(--r-md);padding:14px 20px;margin-bottom:8px;
+    transition:border-color .2s ease;
+  }
+  details[open]{border-color:var(--stroke-strong)}
+  summary{
+    cursor:pointer;list-style:none;
+    font-size:15.5px;font-weight:500;color:var(--text-hi);
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary::after{
+    content:"+";font-size:22px;color:var(--amber);
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    transition:transform .2s ease;line-height:1;
+  }
+  details[open] summary::after{transform:rotate(45deg)}
+  details p{
+    margin:14px 0 4px;color:var(--text-mid);font-size:15px;line-height:1.65;
+  }
+  details ul{margin:10px 0 4px;padding-left:22px;color:var(--text-mid)}
+  details li{margin-bottom:6px}
+
+  /* ─── Self-help cards ───────────────────────────────────────────────── */
+  .help-grid{
+    display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    margin-top:18px;
+  }
+  .help-card{
+    padding:18px;border-radius:var(--r-md);
+    border:1px solid var(--stroke);background:var(--bg-1);
+  }
+  .help-card h4{
+    margin:0 0 6px;font-size:15.5px;color:var(--text-hi);font-weight:600;
+    font-family:"IBM Plex Sans","SF Pro Text",-apple-system,sans-serif;
+  }
+  .help-card p{margin:0;color:var(--text-mid);font-size:14px;line-height:1.6}
+  .pill{
+    display:inline-block;padding:3px 8px;border-radius:var(--r-sm);
+    border:1px solid var(--stroke);
+    background:rgba(255,176,0,.04);color:var(--amber);
+    font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+    margin-bottom:10px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+
+  /* ─── Footer ────────────────────────────────────────────────────────── */
+  footer{
+    max-width:780px;margin:60px auto 0;padding:28px 24px 36px;
+    border-top:1px solid var(--stroke);color:var(--text-lo);font-size:13px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  footer nav a{margin-left:0;margin-right:18px}
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+<div class="grid" aria-hidden="true"></div>
+
+<header>
+  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span> NoJetLag</a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="privacy.html">Privacy</a>
+  </nav>
+</header>
+
+<main>
+  <span class="tag">Help · FAQ</span>
+  <h1>Support</h1>
+  <p class="lede">If something feels off — onboarding stuck on a dead network, the timeline shows odd hours, a melatonin event you don't want — we are here. Most questions are covered below. If yours is not, write to us.</p>
+
+  <div class="contact-card">
+    <div>
+      <span class="label">Contact</span>
+      <a class="email" href="mailto:boytik@actvox.dev">boytik@actvox.dev</a>
+    </div>
+    <a class="btn" href="mailto:boytik@actvox.dev?subject=NoJetLag%20support">Email us</a>
+  </div>
+
+  <h2>First-launch &amp; setup</h2>
+
+  <details>
+    <summary>The app shows "CONNECTION REQUIRED" and won't open.</summary>
+    <p>The first launch needs a brief internet connection so the onboarding screens (medical disclaimer, sleep schedule capture) can load. After you finish onboarding once, NoJetLag works fully offline.</p>
+    <ul>
+      <li>Check your Wi-Fi or cellular signal — toggle airplane mode off/on.</li>
+      <li>Tap the <strong>TRY AGAIN</strong> button on the connection screen.</li>
+      <li>If you are on a captive Wi-Fi (hotel, airport), accept the network's terms in Safari first, then return to NoJetLag.</li>
+    </ul>
+    <p>If a connection is genuinely unavailable for a while, finish onboarding next time you have signal — the app will not let you skip it.</p>
+  </details>
+
+  <details>
+    <summary>Why is onboarding mandatory? Can I skip it?</summary>
+    <p>The onboarding shows the medical disclaimer with a required acknowledgment. Because NoJetLag suggests behaviors around melatonin and sleep, we need every user to read and acknowledge the disclaimer once. After that, it never shows again.</p>
+  </details>
+
+  <details>
+    <summary>Where do I enter my bedtime and wake time?</summary>
+    <p>Right after the Adapty onboarding finishes, a sleep-schedule sheet appears. Enter your usual bedtime and wake time — those two anchors are how the planner computes your circadian phase. You can change them later in <em>Settings → Sleep schedule</em>.</p>
+  </details>
+
+  <h2>The schedule</h2>
+
+  <details>
+    <summary>The plan tells me to go to bed at 18:00. Why?</summary>
+    <p>That is normal during a phase shift, especially flying east. Your body's "bedtime" lives at a fixed point on its internal circadian clock — when that clock is shifted, the wall-clock time of the same biological event moves. The displayed time is the absolute moment your body should sleep, not the local "evening."</p>
+    <p>Tap the event's <strong>WHY THIS</strong> link for the full reasoning.</p>
+  </details>
+
+  <details>
+    <summary>What do STAY-ANCHORED, PARTIAL, and FULL mean on the trip-planner?</summary>
+    <p>These are the three round-trip strategies the planner picks based on how long you stay at the destination:</p>
+    <ul>
+      <li><strong>STAY-ANCHORED</strong> (under 3 days). Your body keeps home time. We only protect your sleep and caffeine cutoff at home schedule. Round-trip shifts cost more than they pay back over a flying visit.</li>
+      <li><strong>PARTIAL</strong> (3 to 6 days). The body moves toward local time but not all the way. Magnitude is capped to fit half the destination stay so the return shift can complete without strain.</li>
+      <li><strong>FULL</strong> (7 days or more, or one-way). Full shift to destination on the outbound leg, full shift back on the return.</li>
+    </ul>
+    <p>The strategy is shown live as you fill out the trip form.</p>
+  </details>
+
+  <details>
+    <summary>I added a return flight and the schedule changed. Why?</summary>
+    <p>Adding a return flight changes the planner's strategy from "one-way full shift" to one of the three round-trip strategies above, picked from the time you spend at the destination. If your stay is short, the planner may decide a full shift is counter-productive and switch to <strong>STAY-ANCHORED</strong>.</p>
+  </details>
+
+  <details>
+    <summary>An event seems wrong — bedtime is in the middle of my flight, light-seek window is 02:00.</summary>
+    <p>Two common causes:</p>
+    <ul>
+      <li>Your departure or arrival time is set to the wrong timezone. Re-check the FROM and TO city codes in <em>Edit trip</em>.</li>
+      <li>Your home bedtime is unusual (e.g., 03:00 → 11:00), which moves all derived events accordingly. Check <em>Settings → Sleep schedule</em>.</li>
+    </ul>
+    <p>If it still looks wrong, send us the trip details and a screenshot — we will look at the math.</p>
+  </details>
+
+  <h2>Melatonin</h2>
+
+  <details>
+    <summary>Should I take melatonin?</summary>
+    <p>That is a question for your doctor, not for an app. NoJetLag suggests <em>timing</em> for low-dose melatonin (0.3–0.5 mg) to reinforce a circadian shift, but it does not prescribe. Availability and legal dose vary by country — see <em>Settings → Melatonin</em> for region-aware notes.</p>
+    <p>Avoid melatonin entirely if you are pregnant or breastfeeding, are under 18, take prescription medication, or have a sleep, mood, or autoimmune condition, until you have spoken with a qualified healthcare professional.</p>
+  </details>
+
+  <details>
+    <summary>Can I turn off melatonin recommendations?</summary>
+    <p>You can ignore melatonin events in the timeline — they are recommendations, not actions the app takes. A toggle to hide them entirely is on the roadmap. If you want it sooner, write to us.</p>
+  </details>
+
+  <h2>Privacy &amp; data</h2>
+
+  <details>
+    <summary>Do you collect any personal information?</summary>
+    <p>No. No accounts, no email, no Apple ID linkage, no health-data integration. Trip details, sleep schedule, and feedback live on your phone. The only third party that briefly receives anonymous data is Adapty, our paywall provider, used to deliver the onboarding screens. The full <a href="privacy.html">privacy policy</a> has the details.</p>
+  </details>
+
+  <details>
+    <summary>Where is my trip data stored?</summary>
+    <p>In a JSON file in NoJetLag's app-storage Documents directory on your iPhone. Apple's standard sandboxing applies — no other app can read it. We do not back it up to our servers.</p>
+  </details>
+
+  <details>
+    <summary>I switched iPhones. Where is my trip?</summary>
+    <p>Trip data does not sync across devices in this version. If your old device's iCloud backup is restored to the new one, app data is restored with it. Otherwise, re-enter the trip on the new device — it takes thirty seconds.</p>
+  </details>
+
+  <details>
+    <summary>How do I delete my data?</summary>
+    <p>Two ways:</p>
+    <ul>
+      <li><strong>Reset just the trip:</strong> <em>Settings → Trip → Clear current trip</em>. Sleep schedule is kept.</li>
+      <li><strong>Wipe everything:</strong> uninstall NoJetLag from your iPhone. All locally stored data is removed.</li>
+    </ul>
+  </details>
+
+  <h2>Audio &amp; notifications</h2>
+
+  <details>
+    <summary>Background ambience won't play.</summary>
+    <p>The audio session is set to <em>ambient</em>, which means:</p>
+    <ul>
+      <li>The phone's silent switch (the side mute toggle) overrides everything. Flip it off and the audio plays.</li>
+      <li>If another app is already playing audio, NoJetLag mixes underneath it at the chosen volume.</li>
+      <li>Audio stops when the app is backgrounded. Continuous playback while the screen is locked is on the roadmap.</li>
+    </ul>
+    <p>Pick a sound in <em>Settings → AMBIENCE</em> and adjust the VOL slider.</p>
+  </details>
+
+  <details>
+    <summary>I expected a push notification before a "seek light" window. It didn't fire.</summary>
+    <p>Notifications are not in v1.0. The protocol is currently passive — you check the timeline. Push reminders for each event are the next major feature on the roadmap. Until then, the <em>NOW</em> tab tells you what to do this hour.</p>
+  </details>
+
+  <h2>Reset &amp; troubleshooting</h2>
+
+  <details>
+    <summary>How do I redo onboarding?</summary>
+    <p>In a Debug build (TestFlight or Xcode build), Settings has a <em>DEBUG · QA ONLY</em> section with a <strong>Reset onboarding</strong> button. In a release build, uninstalling and reinstalling resets onboarding from scratch.</p>
+  </details>
+
+  <details>
+    <summary>The app is stuck on a loading spinner.</summary>
+    <p>Force-quit (swipe up from the home indicator and flick the NoJetLag card upward) and reopen. If it happens again, check that the device has internet for the first launch — Adapty needs it once. Past that, force-quit and relaunch normally.</p>
+  </details>
+
+  <details>
+    <summary>iOS version requirements?</summary>
+    <p>NoJetLag requires iOS 16 or later.</p>
+  </details>
+
+  <h2>Self-help quick tips</h2>
+  <div class="help-grid">
+    <div class="help-card">
+      <span class="pill">Tip · 01</span>
+      <h4>Force-quit and relaunch</h4>
+      <p>Fixes most "stuck on loading" cases.</p>
+    </div>
+    <div class="help-card">
+      <span class="pill">Tip · 02</span>
+      <h4>Check the network on first launch</h4>
+      <p>Onboarding needs internet once. After that, the app runs fully offline.</p>
+    </div>
+    <div class="help-card">
+      <span class="pill">Tip · 03</span>
+      <h4>Toggle the silent switch</h4>
+      <p>Ambient audio respects the iPhone's hardware mute. Flip it off if rain isn't playing.</p>
+    </div>
+    <div class="help-card">
+      <span class="pill">Tip · 04</span>
+      <h4>Edit the trip if events look off</h4>
+      <p>Most "wrong-time" cases trace back to a mis-set timezone. Re-check FROM / TO in the trip form.</p>
+    </div>
+  </div>
+
+  <h2>Reach a human</h2>
+  <p>Email <a href="mailto:boytik@actvox.dev">boytik@actvox.dev</a>. Replies usually within one or two business days. Please include:</p>
+  <ul>
+    <li>iPhone model and iOS version</li>
+    <li>NoJetLag app version (visible in <em>Settings → Version</em>)</li>
+    <li>What you were trying to do, and what happened instead</li>
+    <li>A screenshot, if it is a visual issue</li>
+    <li>Origin and destination timezone identifiers if the question is about a specific trip</li>
+  </ul>
+
+  <h2>Feature requests &amp; bug reports</h2>
+  <p>Same address, <a href="mailto:boytik@actvox.dev">boytik@actvox.dev</a>. We read everything. The current roadmap (in priority order):</p>
+  <ul>
+    <li>Push notifications timed to each protocol event</li>
+    <li>Background audio playback while the screen is locked</li>
+    <li>Apple Health integration for sleep tracking</li>
+    <li>Multi-leg itineraries (more than one stopover)</li>
+    <li>iCloud sync of trips across devices</li>
+  </ul>
+</main>
+
+<footer>
+  <div>© 2026 NoJetLag · Land sharp.</div>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="mailto:boytik@actvox.dev">Contact</a>
+  </nav>
+</footer>
+</body>
+</html>

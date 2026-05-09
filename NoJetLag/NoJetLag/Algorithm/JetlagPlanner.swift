@@ -8,117 +8,231 @@ import Foundation
 /// a chronobiologist before treating these recommendations as medical advice.
 ///
 /// ### Mental model
-/// The user's body is a clock anchored to their origin schedule. Each protocol
-/// day, that clock shifts by up to `maxShiftPerDayHours` toward the destination.
-/// All recommendations are computed as **absolute Dates** anchored in the origin
-/// timezone — the destination timezone only affects how those Dates are
-/// displayed in the UI.
+/// The user's body is a clock anchored to their origin schedule. A full
+/// "phase shift" of magnitude H hours moves the body H hours ahead of (advance)
+/// or behind (delay) home time. Each protocol day, the body shifts up to
+/// `maxShiftPerDayHours`.
+///
+/// ### Round trips
+/// When the trip has a return leg, the planner picks one of three strategies
+/// based on the time spent at destination:
+/// - **stay-anchored** (<3 days): don't shift; keep home schedule.
+/// - **partial** (3–6 days): shift only as far as time at destination allows.
+/// - **full** (≥7 days, or one-way): full delta in both directions.
+///
+/// The return leg mirrors the outbound logic with reversed direction, anchored
+/// on `returnDeparture`.
 struct JetlagPlanner {
     let trip: Trip
     let sleep: SleepSchedule
 
     enum Direction {
-        case advance   // travelling east — body must shift earlier
-        case delay     // travelling west — body must shift later
-        case none      // less than ~1h difference, no protocol needed
+        case advance
+        case delay
     }
 
     /// Maximum daily phase shift the body can comfortably absorb.
     static let maxShiftPerDayHours: Double = 1.5
-    /// Days of pre-flight preparation.
+    /// Days of pre-flight preparation before each leg.
     static let preflightDays: Int = 2
-
-    var direction: Direction {
-        let s = trip.timeZoneShiftHours
-        if abs(s) < 1.0 { return .none }
-        return s > 0 ? .advance : .delay
-    }
-
-    /// How many calendar days the post-arrival adjustment will span.
-    var postArrivalDays: Int {
-        let raw = Int(ceil(abs(trip.timeZoneShiftHours) / Self.maxShiftPerDayHours))
-        return min(max(raw, 1), 6)
-    }
 
     // MARK: - Public entry point
 
     func makePlan() -> [PlanEvent] {
-        guard direction != .none else {
-            return [flightEvent()]
+        var events: [PlanEvent] = [outboundFlightEvent()]
+        let magnitude = trip.plannedShiftHours
+
+        if magnitude >= 1.0 {
+            events.append(contentsOf: outboundShiftEvents(magnitude: magnitude))
+        } else if case .stayAnchored = trip.shiftStrategy {
+            events.append(contentsOf: stayAnchoredAtDestinationEvents())
         }
 
-        var events: [PlanEvent] = [flightEvent()]
-        let totalShift = abs(trip.timeZoneShiftHours)
-        // Advance moves the body earlier → body's wall-clock landmarks move
-        // earlier in absolute time → subtract the shift.
-        let shiftSign: Double = direction == .advance ? -1 : 1
-        let originCal = calendar(in: trip.originTimeZone)
-        let originAnchor = originCal.startOfDay(for: trip.departure)
-
-        for dayIndex in (-Self.preflightDays)...postArrivalDays {
-            let cumShift = cumulativeShift(forDayIndex: dayIndex, total: totalShift)
-
-            // Compute bedtime as an absolute Date in origin TZ.
-            // bedtimeHour can shift past 0 or 24 — handle the wraparound.
-            let bedHourRaw = sleep.bedtimeHour + shiftSign * cumShift
-            let dayOffset = Int(floor(bedHourRaw / 24))
-            let normalizedBedHour = bedHourRaw - Double(dayOffset) * 24
-
-            guard let bedAnchorDay = originCal.date(
-                byAdding: .day,
-                value: dayIndex + dayOffset,
-                to: originAnchor
-            ) else { continue }
-
-            let bedtimeDate = setHour(normalizedBedHour, on: bedAnchorDay, calendar: originCal)
-            let wakeDate = bedtimeDate.addingTimeInterval(sleep.sleepDurationHours * 3600)
-            let cbtDate  = wakeDate.addingTimeInterval(-2 * 3600)
-
-            events.append(makeEvent(
-                kind: .sleep,
-                startsAt: bedtimeDate, endsAt: wakeDate,
-                note: noteForSleep(dayIndex: dayIndex)
-            ))
-            events.append(makeEvent(
-                kind: .wake,
-                startsAt: wakeDate, endsAt: nil,
-                note: nil
-            ))
-
-            switch direction {
-            case .advance:
-                events.append(contentsOf: advanceEvents(
-                    bedtimeDate: bedtimeDate, wakeDate: wakeDate, cbtDate: cbtDate
-                ))
-            case .delay:
-                events.append(contentsOf: delayEvents(
-                    bedtimeDate: bedtimeDate, wakeDate: wakeDate
-                ))
-            case .none:
-                break
+        if trip.isRoundTrip {
+            if let ret = returnFlightEvent() {
+                events.append(ret)
             }
-
-            // Caffeine cutoff: 6h before today's bedtime.
-            let caffeineCutoff = bedtimeDate.addingTimeInterval(-6 * 3600)
-            events.append(makeEvent(
-                kind: .caffeineAvoid,
-                startsAt: caffeineCutoff, endsAt: bedtimeDate,
-                note: "Cut caffeine at least 6 hours before bedtime."
-            ))
+            if magnitude >= 1.0 {
+                events.append(contentsOf: returnShiftEvents(magnitude: magnitude))
+            }
+            // stay-anchored: home schedule already covered by stayAnchoredAtDestinationEvents
         }
 
         return events.sorted { $0.startsAt < $1.startsAt }
     }
 
-    // MARK: - PRC event builders
+    // MARK: - Outbound shift
 
-    /// ADVANCE direction (eastward):
-    ///   • Bright morning light (right after waking) pulls the clock earlier.
-    ///   • Dim evening light (right before bedtime) prevents pushing back.
+    /// Body shifts from phase 0 → ±magnitude over preflight + post-arrival days.
+    private func outboundShiftEvents(magnitude: Double) -> [PlanEvent] {
+        let outboundDelta = trip.timeZoneShiftHours
+        let direction: Direction = outboundDelta > 0 ? .advance : .delay
+        let shiftSign: Double = direction == .advance ? -1 : 1
+        let postArrivalDays = max(1, min(6, Int(ceil(magnitude / Self.maxShiftPerDayHours))))
+
+        let originCal = calendar(in: trip.originTimeZone)
+        let originAnchor = originCal.startOfDay(for: trip.departure)
+
+        var events: [PlanEvent] = []
+
+        for dayIndex in (-Self.preflightDays)...postArrivalDays {
+            // Cumulative shift achieved by the start of this day.
+            let cumShift = min(
+                magnitude,
+                Double(max(0, dayIndex + Self.preflightDays)) * Self.maxShiftPerDayHours
+            )
+
+            // Body's "23:00" in HOME wall-clock at this point in the protocol.
+            // Advance: bedtime moves earlier in home time → bedtime - cumShift.
+            // Delay:   bedtime moves later   in home time → bedtime + cumShift.
+            let bedHourRaw = sleep.bedtimeHour + shiftSign * cumShift
+
+            guard let bedtimeDate = absoluteBedtime(bedHourRaw: bedHourRaw,
+                                                   relativeDayIndex: dayIndex,
+                                                   anchor: originAnchor,
+                                                   calendar: originCal)
+            else { continue }
+
+            events.append(contentsOf: dailyEvents(
+                bedtimeDate: bedtimeDate,
+                direction: direction,
+                sleepNote: outboundSleepNote(dayIndex: dayIndex)
+            ))
+        }
+
+        return events
+    }
+
+    // MARK: - Return shift
+
+    /// Body shifts from phase ±magnitude → 0 over preflight + post-return days.
+    /// Direction is the OPPOSITE of the outbound direction.
+    private func returnShiftEvents(magnitude: Double) -> [PlanEvent] {
+        guard let returnDep = trip.returnDeparture else { return [] }
+
+        let outboundDelta = trip.timeZoneShiftHours
+        let returnDirection: Direction = outboundDelta > 0 ? .delay : .advance
+        // outboundPhaseSign represents the body's residual phase relative to
+        // home at the start of the return protocol: +1 if outbound was advance
+        // (body is ahead of home), -1 if outbound was delay.
+        let outboundPhaseSign: Double = outboundDelta > 0 ? 1 : -1
+
+        let postReturnDays = max(1, min(6, Int(ceil(magnitude / Self.maxShiftPerDayHours))))
+
+        let originCal = calendar(in: trip.originTimeZone)
+        let returnAnchor = originCal.startOfDay(for: returnDep)
+
+        var events: [PlanEvent] = []
+
+        for dayIndex in (-Self.preflightDays)...postReturnDays {
+            // Cumulative *reverse* shift: 0 at -preflightDays, magnitude at end.
+            let cumReverse = min(
+                magnitude,
+                Double(max(0, dayIndex + Self.preflightDays)) * Self.maxShiftPerDayHours
+            )
+            // Residual phase at start of this day (signed).
+            let phase = outboundPhaseSign * (magnitude - cumReverse)
+
+            // Bedtime in home wall-clock = sleep.bedtimeHour - phase.
+            let bedHourRaw = sleep.bedtimeHour - phase
+
+            guard let bedtimeDate = absoluteBedtime(bedHourRaw: bedHourRaw,
+                                                   relativeDayIndex: dayIndex,
+                                                   anchor: returnAnchor,
+                                                   calendar: originCal)
+            else { continue }
+
+            events.append(contentsOf: dailyEvents(
+                bedtimeDate: bedtimeDate,
+                direction: returnDirection,
+                sleepNote: returnSleepNote(dayIndex: dayIndex)
+            ))
+        }
+
+        return events
+    }
+
+    // MARK: - Stay-anchored mode (short round trips, <3 days at destination)
+
+    /// Generates simple home-schedule sleep + caffeine events covering the
+    /// entire destination stay. No light/melatonin events — body stays on
+    /// home time so the user just powers through.
+    private func stayAnchoredAtDestinationEvents() -> [PlanEvent] {
+        guard let returnDep = trip.returnDeparture else { return [] }
+
+        let originCal = calendar(in: trip.originTimeZone)
+        let arrivalDayStart = originCal.startOfDay(for: trip.arrival)
+
+        // Generate up to 7 days of home-schedule events covering [arrival, returnDeparture].
+        var events: [PlanEvent] = []
+        for dayOffset in 0...7 {
+            guard let dayDate = originCal.date(byAdding: .day, value: dayOffset, to: arrivalDayStart) else { continue }
+            let bedtimeDate = setHour(sleep.bedtimeHour, on: dayDate, calendar: originCal)
+            let wakeDate = bedtimeDate.addingTimeInterval(sleep.sleepDurationHours * 3600)
+
+            // Only include if bedtime falls inside the destination-stay window.
+            guard bedtimeDate >= trip.arrival, bedtimeDate < returnDep else { continue }
+
+            events.append(makeEvent(
+                kind: .sleep, startsAt: bedtimeDate, endsAt: wakeDate,
+                note: "Stay on home time — short trip."
+            ))
+            events.append(makeEvent(
+                kind: .wake, startsAt: wakeDate, endsAt: nil, note: nil
+            ))
+
+            let caffeineCutoff = bedtimeDate.addingTimeInterval(-6 * 3600)
+            events.append(makeEvent(
+                kind: .caffeineAvoid, startsAt: caffeineCutoff, endsAt: bedtimeDate,
+                note: "Cut caffeine at least 6 hours before bedtime."
+            ))
+        }
+        return events
+    }
+
+    // MARK: - Per-day event bundle (sleep + light + melatonin + caffeine)
+
+    private func dailyEvents(
+        bedtimeDate: Date,
+        direction: Direction,
+        sleepNote: String?
+    ) -> [PlanEvent] {
+        let wakeDate = bedtimeDate.addingTimeInterval(sleep.sleepDurationHours * 3600)
+        let cbtDate  = wakeDate.addingTimeInterval(-2 * 3600)
+
+        var events: [PlanEvent] = [
+            makeEvent(kind: .sleep, startsAt: bedtimeDate, endsAt: wakeDate, note: sleepNote),
+            makeEvent(kind: .wake, startsAt: wakeDate, endsAt: nil, note: nil)
+        ]
+
+        switch direction {
+        case .advance:
+            events.append(contentsOf: advanceEvents(
+                bedtimeDate: bedtimeDate, wakeDate: wakeDate, cbtDate: cbtDate
+            ))
+        case .delay:
+            events.append(contentsOf: delayEvents(
+                bedtimeDate: bedtimeDate, wakeDate: wakeDate
+            ))
+        }
+
+        let caffeineCutoff = bedtimeDate.addingTimeInterval(-6 * 3600)
+        events.append(makeEvent(
+            kind: .caffeineAvoid,
+            startsAt: caffeineCutoff, endsAt: bedtimeDate,
+            note: "Cut caffeine at least 6 hours before bedtime."
+        ))
+
+        return events
+    }
+
+    /// ADVANCE direction (body needs to move earlier):
+    ///   • Bright morning light right after waking pulls the clock earlier.
+    ///   • Dim evening light right before bedtime prevents pushing back.
     ///   • Low-dose melatonin a few hours before bed accelerates the advance.
     private func advanceEvents(bedtimeDate: Date, wakeDate: Date, cbtDate: Date) -> [PlanEvent] {
-        let lightStart = wakeDate                            // wake
-        let lightEnd   = wakeDate.addingTimeInterval(3 * 3600) // wake + 3h
+        let lightStart = wakeDate
+        let lightEnd   = wakeDate.addingTimeInterval(3 * 3600)
         let avoidStart = bedtimeDate.addingTimeInterval(-3 * 3600)
         let avoidEnd   = bedtimeDate
         let melatonin  = bedtimeDate.addingTimeInterval(-5 * 3600)
@@ -133,8 +247,8 @@ struct JetlagPlanner {
         ]
     }
 
-    /// DELAY direction (westward):
-    ///   • Evening bright light (before bed) pushes the clock later.
+    /// DELAY direction (body needs to move later):
+    ///   • Evening bright light before bed pushes the clock later.
     ///   • Dim morning light right after waking prevents pulling forward.
     ///   • Optional morning melatonin can support the delay.
     private func delayEvents(bedtimeDate: Date, wakeDate: Date) -> [PlanEvent] {
@@ -153,45 +267,26 @@ struct JetlagPlanner {
         ]
     }
 
-    // MARK: - Helpers
+    // MARK: - Date math
 
-    private func flightEvent() -> PlanEvent {
-        PlanEvent(
-            kind: .flight,
-            startsAt: trip.departure,
-            endsAt: trip.arrival,
-            timeZoneId: trip.destinationTimeZoneId,
-            note: trip.name
-        )
-    }
+    /// Convert a (possibly out-of-range) bedtime hour into an absolute Date by
+    /// folding the day-overflow into a calendar-day offset.
+    private func absoluteBedtime(
+        bedHourRaw: Double,
+        relativeDayIndex: Int,
+        anchor: Date,
+        calendar cal: Calendar
+    ) -> Date? {
+        let dayOffset = Int(floor(bedHourRaw / 24))
+        let normalizedBedHour = bedHourRaw - Double(dayOffset) * 24
 
-    /// Cumulative shift in hours achieved by the start of a given day index.
-    /// Pre-flight days (-2, -1) accumulate shift; departure day = 0; post-arrival
-    /// days continue accumulating until total shift is reached.
-    private func cumulativeShift(forDayIndex dayIndex: Int, total: Double) -> Double {
-        let daysSinceShiftStart = max(0, dayIndex + Self.preflightDays)
-        return min(total, Double(daysSinceShiftStart) * Self.maxShiftPerDayHours)
-    }
+        guard let bedAnchorDay = cal.date(
+            byAdding: .day,
+            value: relativeDayIndex + dayOffset,
+            to: anchor
+        ) else { return nil }
 
-    /// Wraps an event in the right display-timezone metadata. Events before
-    /// arrival are shown in origin time; events at or after arrival are shown
-    /// in destination time.
-    private func makeEvent(
-        kind: PlanEventKind,
-        startsAt: Date,
-        endsAt: Date?,
-        note: String?
-    ) -> PlanEvent {
-        let tzId = startsAt < trip.arrival
-            ? trip.originTimeZoneId
-            : trip.destinationTimeZoneId
-        return PlanEvent(
-            kind: kind,
-            startsAt: startsAt,
-            endsAt: endsAt,
-            timeZoneId: tzId,
-            note: note
-        )
+        return setHour(normalizedBedHour, on: bedAnchorDay, calendar: cal)
     }
 
     private func calendar(in tz: TimeZone) -> Calendar {
@@ -206,12 +301,80 @@ struct JetlagPlanner {
         return cal.date(bySettingHour: h, minute: m, second: 0, of: date) ?? date
     }
 
-    private func noteForSleep(dayIndex: Int) -> String? {
+    // MARK: - Flight events
+
+    private func outboundFlightEvent() -> PlanEvent {
+        PlanEvent(
+            kind: .flight,
+            startsAt: trip.departure,
+            endsAt: trip.arrival,
+            timeZoneId: trip.destinationTimeZoneId,
+            note: trip.name
+        )
+    }
+
+    private func returnFlightEvent() -> PlanEvent? {
+        guard let depart = trip.returnDeparture, let arrive = trip.returnArrival else { return nil }
+        return PlanEvent(
+            kind: .flight,
+            startsAt: depart,
+            endsAt: arrive,
+            timeZoneId: trip.originTimeZoneId,
+            note: "Return — \(trip.name)"
+        )
+    }
+
+    // MARK: - Display TZ helper
+
+    /// Tags an event with the right display TZ based on where the user is at
+    /// `startsAt`:
+    ///   • before outbound arrival           → origin
+    ///   • between outbound arrival and
+    ///     return arrival (or trip.arrival
+    ///     for one-way trips)                → destination
+    ///   • after return arrival (round trip) → origin
+    private func makeEvent(
+        kind: PlanEventKind,
+        startsAt: Date,
+        endsAt: Date?,
+        note: String?
+    ) -> PlanEvent {
+        let tzId: String
+        if let returnArrival = trip.returnArrival, startsAt >= returnArrival {
+            tzId = trip.originTimeZoneId
+        } else if startsAt >= trip.arrival {
+            tzId = trip.destinationTimeZoneId
+        } else {
+            tzId = trip.originTimeZoneId
+        }
+        return PlanEvent(
+            kind: kind,
+            startsAt: startsAt,
+            endsAt: endsAt,
+            timeZoneId: tzId,
+            note: note
+        )
+    }
+
+    // MARK: - Per-day notes
+
+    private func outboundSleepNote(dayIndex: Int) -> String? {
         switch dayIndex {
         case -Self.preflightDays..<0:
             return "Shift bedtime gradually toward your destination schedule."
         case 0:
             return "On the plane — try to align sleep with your destination night."
+        default:
+            return nil
+        }
+    }
+
+    private func returnSleepNote(dayIndex: Int) -> String? {
+        switch dayIndex {
+        case -Self.preflightDays..<0:
+            return "Shift bedtime back toward your home schedule."
+        case 0:
+            return "On the plane home — sleep aligned with your home night."
         default:
             return nil
         }

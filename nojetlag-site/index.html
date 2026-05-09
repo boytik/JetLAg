@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NoJetLag — Land sharp from any timezone.</title>
+<meta name="description" content="Personal jet lag protocol from your flight. Light, sleep, and melatonin timing tuned to your destination. Built for pilots and frequent travelers.">
+<meta name="theme-color" content="#0E1116">
+<meta property="og:title" content="NoJetLag — Land sharp from any timezone.">
+<meta property="og:description" content="Personal circadian-shift schedule from a single flight. On-device. Not medical advice.">
+<meta property="og:type" content="website">
+<style>
+  :root{
+    /* DESIGN.md tokens — cockpit-night dark palette */
+    --bg-0:#0E1116;
+    --bg-1:#161A22;
+    --bg-2:#1D222C;
+    --stroke:#2A2F36;
+    --stroke-strong:#3A4049;
+    --text-hi:#ECECEC;
+    --text-mid:#B7BCC4;
+    --text-lo:#8A8F98;
+    --amber:#FFB000;
+    --amber-dim:#B07700;
+    --advisory-red:#E5484D;
+    --indigo:#5E6AD2;
+    --green:#46A758;
+    --r-sm:4px;
+    --r-md:8px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"IBM Plex Sans","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;
+    color:var(--text-hi);
+    background:var(--bg-0);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:var(--amber);text-decoration:none}
+  a:hover{color:#fff}
+
+  /* Subtle dot grid + amber glow — instrument-panel motif, not cosmic stars */
+  .grid{
+    position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.35;
+    background-image:radial-gradient(circle, var(--stroke) 1px, transparent 1px);
+    background-size:24px 24px;
+    mask-image:radial-gradient(ellipse at 50% 30%, black 0%, transparent 75%);
+    -webkit-mask-image:radial-gradient(ellipse at 50% 30%, black 0%, transparent 75%);
+  }
+  .glow{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(700px 500px at 80% -10%, rgba(255,176,0,.08), transparent 60%),
+      radial-gradient(600px 400px at -10% 30%, rgba(255,176,0,.04), transparent 60%);
+  }
+
+  main,header,footer{position:relative;z-index:1}
+
+  /* Mono helpers */
+  .mono{
+    font-family:"IBM Plex Mono","SF Mono","JetBrains Mono",ui-monospace,"Menlo","Consolas",monospace;
+    font-feature-settings:"tnum" 1;
+  }
+  .tag{
+    display:inline-block;
+    font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+    color:var(--amber);
+    padding:5px 10px;border:1px solid var(--stroke);border-radius:var(--r-sm);
+    background:rgba(255,176,0,.04);
+  }
+
+  /* Header */
+  header{
+    padding:28px 24px 0;
+    max-width:1080px;margin:0 auto;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+  }
+  .brand{
+    display:flex;align-items:center;gap:12px;
+    font-weight:600;letter-spacing:.4px;color:var(--text-hi);
+  }
+  .brand-mark{
+    position:relative;width:30px;height:30px;
+    border:1.5px solid var(--amber);border-radius:50%;
+    flex-shrink:0;
+  }
+  .brand-mark::before,.brand-mark::after{
+    content:"";position:absolute;background:var(--amber);
+  }
+  .brand-mark::before{
+    left:50%;top:-3px;bottom:-3px;width:1.5px;transform:translateX(-50%);
+  }
+  .brand-mark::after{
+    top:50%;left:-3px;right:-3px;height:1.5px;transform:translateY(-50%);
+  }
+  nav a{
+    margin-left:24px;color:var(--text-lo);font-size:13px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    font-family:"IBM Plex Mono","SF Mono","JetBrains Mono",ui-monospace,monospace;
+    transition:color .15s ease;
+  }
+  nav a:hover{color:var(--amber)}
+
+  /* Hero */
+  .hero{
+    max-width:1080px;margin:0 auto;padding:80px 24px 60px;
+    text-align:center;
+  }
+  h1{
+    font-family:"IBM Plex Sans Condensed","SF Pro Display",-apple-system,sans-serif;
+    font-weight:600;
+    font-size:clamp(44px,7vw,84px);
+    line-height:1.05;letter-spacing:-.02em;
+    margin:24px 0 18px;color:var(--text-hi);
+    font-stretch:condensed;
+  }
+  .lede{
+    max-width:640px;margin:0 auto;
+    font-size:clamp(16px,1.5vw,18px);color:var(--text-mid);
+  }
+
+  /* Hero instrument — concentric ticked dial, no emoji */
+  .hero-dial{
+    position:relative;
+    width:min(280px,60vw);aspect-ratio:1;margin:56px auto 0;
+  }
+  .hero-dial .outer{
+    position:absolute;inset:0;border:1.5px solid var(--amber);border-radius:50%;
+    box-shadow:0 0 60px rgba(255,176,0,.2),inset 0 0 30px rgba(255,176,0,.08);
+  }
+  .hero-dial .inner{
+    position:absolute;inset:24%;border:1px solid var(--stroke-strong);border-radius:50%;
+  }
+  .hero-dial .crosshair-v,.hero-dial .crosshair-h{
+    position:absolute;background:var(--stroke);
+  }
+  .hero-dial .crosshair-v{left:50%;top:8%;bottom:8%;width:1px;transform:translateX(-50%)}
+  .hero-dial .crosshair-h{top:50%;left:8%;right:8%;height:1px;transform:translateY(-50%)}
+  .hero-dial .center-dot{
+    position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;
+    background:var(--amber);transform:translate(-50%,-50%);
+    box-shadow:0 0 16px rgba(255,176,0,.6);
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  .hero-dial .label{
+    position:absolute;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;
+    color:var(--text-lo);
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  .hero-dial .label.top{top:-22px;left:50%;transform:translateX(-50%)}
+  .hero-dial .label.bottom{bottom:-22px;left:50%;transform:translateX(-50%);color:var(--amber)}
+  /* tick marks every 30deg */
+  .hero-dial .tick{
+    position:absolute;left:50%;top:0;width:1px;height:8px;
+    background:var(--stroke-strong);transform-origin:50% calc(min(280px,60vw)/2);
+  }
+
+  @keyframes pulse{
+    0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    50%{opacity:.5;transform:translate(-50%,-50%) scale(1.4)}
+  }
+
+  /* Disclaimer strip */
+  .disclaimer-strip{
+    max-width:680px;margin:48px auto 0;padding:14px 20px;
+    font-size:13px;color:var(--text-mid);text-align:center;
+    border:1px solid var(--stroke);border-radius:var(--r-md);background:var(--bg-1);
+  }
+  .disclaimer-strip strong{color:var(--amber);font-weight:600}
+
+  /* Sections */
+  section{max-width:1080px;margin:0 auto;padding:80px 24px}
+  .section-header{margin-bottom:40px}
+  h2{
+    font-family:"IBM Plex Sans Condensed","SF Pro Display",-apple-system,sans-serif;
+    font-weight:600;
+    font-size:clamp(28px,3.5vw,40px);
+    margin:12px 0;letter-spacing:-.01em;color:var(--text-hi);
+  }
+  .section-lede{color:var(--text-mid);font-size:16px;max-width:600px;margin:0}
+
+  /* Card grids */
+  .lever-grid,.feature-grid,.strategy-grid{
+    display:grid;gap:16px;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  }
+
+  .card{
+    padding:24px;border-radius:var(--r-md);
+    background:var(--bg-1);border:1px solid var(--stroke);
+    transition:border-color .2s ease, transform .2s ease;
+  }
+  .card:hover{border-color:var(--stroke-strong);transform:translateY(-2px)}
+
+  .card-tag{
+    display:inline-block;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:10px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+    margin-bottom:14px;
+    padding:4px 8px;border-radius:var(--r-sm);border:1px solid currentColor;
+  }
+  .card h3{
+    margin:0 0 6px;font-size:18px;font-weight:600;color:var(--text-hi);
+    font-family:"IBM Plex Sans","SF Pro Text",-apple-system,sans-serif;
+  }
+  .card p{margin:0;color:var(--text-mid);font-size:14.5px}
+
+  /* Lever-specific tints */
+  .lever--light .card-tag{color:var(--amber)}
+  .lever--melatonin .card-tag{color:var(--indigo)}
+  .lever--sleep .card-tag{color:var(--text-mid)}
+
+  /* Strategy-specific tints */
+  .strategy--anchored .card-tag{color:var(--green)}
+  .strategy--partial .card-tag{color:var(--indigo)}
+  .strategy--full .card-tag{color:var(--amber)}
+
+  /* Feature card amber dot */
+  .feature .dot{
+    width:6px;height:6px;border-radius:50%;background:var(--amber);
+    display:inline-block;margin-bottom:14px;
+    box-shadow:0 0 8px rgba(255,176,0,.6);
+  }
+  .feature h4{
+    margin:0 0 6px;font-size:16px;font-weight:600;color:var(--text-hi);
+    font-family:"IBM Plex Sans","SF Pro Text",-apple-system,sans-serif;
+  }
+  .feature p{margin:0;color:var(--text-mid);font-size:14.5px}
+
+  /* Privacy band */
+  .privacy-band{
+    margin:80px auto;max-width:880px;padding:36px;
+    border-radius:var(--r-md);border:1px solid var(--amber);
+    background:rgba(255,176,0,.03);
+    text-align:center;
+    position:relative;
+  }
+  .privacy-band::before{
+    content:"";position:absolute;left:0;top:24px;bottom:24px;width:3px;
+    background:var(--amber);
+  }
+  .privacy-band h2{margin-bottom:10px}
+  .privacy-band .links{margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+  /* Buttons */
+  .btn{
+    display:inline-block;padding:11px 22px;
+    border-radius:var(--r-md);font-weight:600;font-size:13px;
+    border:1px solid var(--amber);
+    background:var(--amber);color:var(--bg-0);
+    text-transform:uppercase;letter-spacing:1.4px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    transition:opacity .2s ease;
+  }
+  .btn:hover{color:var(--bg-0);opacity:.85}
+  .btn--ghost{
+    background:transparent;border-color:var(--stroke);color:var(--text-mid);
+  }
+  .btn--ghost:hover{color:var(--text-hi);border-color:var(--text-mid);background:var(--bg-1)}
+
+  /* Footer */
+  footer{
+    max-width:1080px;margin:0 auto;padding:60px 24px 48px;
+    border-top:1px solid var(--stroke);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px;
+    color:var(--text-lo);font-size:13px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  footer nav a{margin-left:0;margin-right:22px}
+
+  @media (max-width:560px){
+    header{padding-top:18px}
+    nav a{margin-left:14px;font-size:12px}
+    .hero{padding-top:48px}
+    section{padding:60px 22px}
+    .privacy-band{padding:28px 22px}
+  }
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+<div class="grid" aria-hidden="true"></div>
+
+<header>
+  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span> NoJetLag</a>
+  <nav>
+    <a href="#how">How</a>
+    <a href="#features">Features</a>
+    <a href="support.html">Support</a>
+    <a href="privacy.html">Privacy</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <span class="tag">Setup · Land sharp</span>
+    <h1>Land sharp from any timezone.</h1>
+    <p class="lede">Personal circadian-shift schedule from a single flight. Light timing, sleep windows, optional low-dose melatonin. Built for pilots and frequent travelers.</p>
+
+    <div class="hero-dial" aria-hidden="true">
+      <span class="label top mono">PHASE</span>
+      <div class="outer"></div>
+      <div class="crosshair-v"></div>
+      <div class="crosshair-h"></div>
+      <div class="inner"></div>
+      <div class="center-dot"></div>
+      <span class="label bottom mono">+05H · ADVANCE</span>
+    </div>
+
+    <p class="disclaimer-strip"><strong>Not medical advice.</strong> NoJetLag is general guidance based on circadian-rhythm research. Consult a qualified healthcare professional before starting any melatonin protocol.</p>
+  </section>
+
+  <section id="how">
+    <div class="section-header">
+      <span class="tag">How it works</span>
+      <h2>Three levers, one schedule.</h2>
+      <p class="section-lede">Bright light. Low-dose melatonin. A stepwise sleep window. Tuned to the timezone you are flying into.</p>
+    </div>
+    <div class="lever-grid">
+      <div class="card lever--light">
+        <span class="card-tag mono">Light</span>
+        <h3>Bright light at the right hour</h3>
+        <p>Morning light pulls your clock earlier. Evening light pushes it later. The dominant effect — handled first by the schedule.</p>
+      </div>
+      <div class="card lever--melatonin">
+        <span class="card-tag mono">Melatonin</span>
+        <h3>Low-dose melatonin, optional</h3>
+        <p>0.3–0.5 mg timed to reinforce the shift, only if your country and your doctor allow it. Country-aware notes in Settings.</p>
+      </div>
+      <div class="card lever--sleep">
+        <span class="card-tag mono">Sleep</span>
+        <h3>Stepwise sleep window</h3>
+        <p>Bedtime moves up to 1.5 hours per protocol day. Compresses what would be five days of fog into a couple.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="round-trips">
+    <div class="section-header">
+      <span class="tag">Round trips</span>
+      <h2>Three strategies. Picked for you.</h2>
+      <p class="section-lede">Add a return leg and the planner picks the right shift mode based on how long you stay at the destination.</p>
+    </div>
+    <div class="strategy-grid">
+      <div class="card strategy--anchored">
+        <span class="card-tag mono">Stay-anchored · &lt;3 days</span>
+        <h3>Don't shift</h3>
+        <p>For a flying visit, your body stays on home time. Round-trip shifts cost more than they pay back. We just protect your sleep.</p>
+      </div>
+      <div class="card strategy--partial">
+        <span class="card-tag mono">Partial · 3–6 days</span>
+        <h3>Halfway there</h3>
+        <p>Body moves toward local time, not all the way. Coming home is gentle. The cap is computed from your time at destination.</p>
+      </div>
+      <div class="card strategy--full">
+        <span class="card-tag mono">Full · 7+ days</span>
+        <h3>Full shift, both ways</h3>
+        <p>Full shift to destination over the first protocol days, full shift back when you return. Standard long-haul mode.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="section-header">
+      <span class="tag">What you get</span>
+      <h2>Instrument, not wellness.</h2>
+      <p class="section-lede">Computed on your device. No account, no email, no advertising SDKs. Pilot-watch energy.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="card feature"><span class="dot"></span><h4>Day-by-day timeline</h4><p>Starts two days before takeoff. Discrete events: light, avoid light, melatonin, sleep, wake, no caffeine.</p></div>
+      <div class="card feature"><span class="dot"></span><h4>Right-now card</h4><p>What to do this hour and what is next. The first thing you see when you open the app on a moving day.</p></div>
+      <div class="card feature"><span class="dot"></span><h4>Calendar mode</h4><p>The whole protocol at a glance. Each day shows the kinds of events scheduled with colored dots.</p></div>
+      <div class="card feature"><span class="dot"></span><h4>Ambient audio</h4><p>Optional rain, forest, or cat for focus and rest. Off by default outside of the app.</p></div>
+      <div class="card feature"><span class="dot"></span><h4>On-device</h4><p>Your trip details, sleep schedule, and feedback never leave your iPhone. The schedule is computed locally.</p></div>
+      <div class="card feature"><span class="dot"></span><h4>Trip history</h4><p>A short feedback loop after every trip helps tune future schedules to how your body actually responds.</p></div>
+    </div>
+  </section>
+
+  <section class="privacy-band">
+    <span class="tag">Private by design</span>
+    <h2>No account. No tracking.</h2>
+    <p class="section-lede" style="margin:0 auto 8px">Your trip details, sleep schedule, and feedback live on your device. Onboarding analytics are anonymous and limited to the paywall provider.</p>
+    <div class="links">
+      <a class="btn" href="privacy.html">Read the privacy policy</a>
+      <a class="btn btn--ghost" href="support.html">Get support</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div>© 2026 NoJetLag · Land sharp.</div>
+  <nav>
+    <a href="privacy.html">Privacy</a>
+    <a href="support.html">Support</a>
+    <a href="mailto:boytik@actvox.dev">boytik@actvox.dev</a>
+  </nav>
+</footer>
+</body>
+</html>
