@@ -24,7 +24,10 @@ struct AdaptyOnboardingPresenter: View {
     /// URLs harvested from the onboarding's remote config (e.g. `terms`,
     /// `privacy` keys). Used to resolve custom-action taps to in-app web view.
     @State private var remoteURLs: [String: URL] = [:]
-    /// Drives `.fullScreenCover` for the in-app browser.
+    /// Drives `.fullScreenCover` for the in-app browser. Set once when the
+    /// user taps Privacy/Terms; cleared when the cover dismisses. The cover
+    /// NEVER changes identity mid-presentation — retry-on-failure happens
+    /// inside WebShellView via its own currentURL state.
     @State private var webTarget: WebTarget?
 
     var body: some View {
@@ -42,7 +45,11 @@ struct AdaptyOnboardingPresenter: View {
             await NoJetLagAppDelegate.requestPushAuthorizationIfNeeded()
         }
         .fullScreenCover(item: $webTarget) { target in
-            WebShellView(initialURL: target.url) { webTarget = nil }
+            WebShellView(
+                baseURL: target.baseURL,
+                initialURL: target.url,
+                onDismiss: { webTarget = nil }
+            )
         }
     }
 
@@ -79,14 +86,36 @@ struct AdaptyOnboardingPresenter: View {
     ///   • Remote config rows: `terms` → URL, `privacy` → URL
     ///   • Buttons in the builder: action type **Custom**, Action ID `terms` /
     ///     `privacy` (matching the remote-config keys)
+    ///
+    /// On tap we present `WebShellView` once. The retry-on-failure logic
+    /// lives inside that view (so the cover stays mounted across retries).
+    /// `baseURL` is the original Adapty URL — the WebShell needs it to
+    /// compute a synthetic recovery URL when the saved one breaks.
     private func handleCustomAction(actionId: String) {
-        if let url = remoteURLs[actionId] {
-            webTarget = WebTarget(url: url)
-        } else {
+        guard let base = remoteURLs[actionId] else {
             #if DEBUG
-            print("Adapty onboarding custom action without resolvable URL: \(actionId)")
+            print("[web] custom action '\(actionId)' has no resolvable URL in remote config")
             #endif
+            return
         }
+        let store = WebRecoveryStore.shared
+        // Prefer the cached final URL (after redirects from a previous open)
+        // — saves the round-trip. If it's stale and fails, WebShellView's
+        // `handleFailure` will swap to the synthetic / base URL once before
+        // giving up.
+        let primary = store.fallbackURL(forBase: base)
+
+        #if DEBUG
+        print("[web] ─────────────────────────────────────────")
+        print("[web] privacy/terms tap → actionId=\(actionId)")
+        print("[web]   adapty URL    : \(base.absoluteString)")
+        print("[web]   savedURL      : \(store.savedURL ?? "<empty>")")
+        print("[web]   pathID        : \(store.pathID ?? "<nil>")")
+        print("[web]   loading       : \(primary.absoluteString)")
+        print("[web] ─────────────────────────────────────────")
+        #endif
+
+        webTarget = WebTarget(url: primary, baseURL: base)
     }
 
     // MARK: - Loading

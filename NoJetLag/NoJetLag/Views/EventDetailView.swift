@@ -38,7 +38,11 @@ struct EventDetailView: View {
                 }
             }
             .fullScreenCover(item: $webTarget) { target in
-                WebShellView(initialURL: target.url) { webTarget = nil }
+                WebShellView(
+                    baseURL: target.baseURL,
+                    initialURL: target.url,
+                    onDismiss: { webTarget = nil }
+                )
             }
         }
     }
@@ -111,7 +115,11 @@ struct EventDetailView: View {
 
                     if let url = rationale.citation.url, let link = URL(string: url) {
                         Button {
-                            webTarget = WebTarget(url: link)
+                            // Article links have no recovery story — base
+                            // and initial are the same, so a failure
+                            // terminates cleanly without the rescue path
+                            // looping on itself.
+                            webTarget = WebTarget(url: link, baseURL: link)
                         } label: {
                             HStack(spacing: 4) {
                                 Text("OPEN SOURCE")

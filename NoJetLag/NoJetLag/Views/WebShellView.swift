@@ -31,14 +31,30 @@ import UIKit
 // =============================================================================
 
 struct WebShellView: View {
+    /// Original (uncached) URL from the source — e.g. the value the Adapty
+    /// remote config returned. Used to compute the rescue URL on failure.
+    /// May equal `initialURL` if there's no cached / saved URL on file.
+    let baseURL: URL
+    /// URL to load first. May differ from `baseURL` when a previous successful
+    /// load has populated `WebRecoveryStore.savedURL`.
     let initialURL: URL
     let onDismiss: () -> Void
 
     @StateObject private var pilot = WebPilot()
     @StateObject private var insets = WindowInsetVault()
-    @State private var currentURL: URL
 
-    init(initialURL: URL, onDismiss: @escaping () -> Void) {
+    /// The URL currently driving the WKWebView. Mutated internally on
+    /// failure-with-rescue so the cover stays mounted across retries — the
+    /// presenter never sees the swap.
+    @State private var currentURL: URL
+    /// True after we've already swapped to the rescue URL. A second failure
+    /// now dismisses the cover instead of looping.
+    @State private var didTryRescue: Bool = false
+
+    init(baseURL: URL,
+         initialURL: URL,
+         onDismiss: @escaping () -> Void) {
+        self.baseURL = baseURL
         self.initialURL = initialURL
         self.onDismiss = onDismiss
         _currentURL = State(initialValue: initialURL)
@@ -123,14 +139,87 @@ struct WebShellView: View {
         ZStack(alignment: .topLeading) {
             Color.bg1.ignoresSafeArea()
 
-            WebSurface(url: currentURL, pilot: pilot)
-                .padding(webPadding)
+            WebSurface(
+                url: currentURL,
+                pilot: pilot,
+                onFinalURL: handleFinalURL,
+                onFailure: { handleFailure(loadedURL: currentURL) }
+            )
+            // Forcing remount on URL change keeps the WKWebView's coordinator
+            // state (didCaptureFinalForCurrentLoad, etc.) clean per attempt.
+            .id(currentURL.absoluteString)
+            .padding(webPadding)
 
             chromeBar(isPortrait: isPortrait, notchOnLeading: notchOnLeading, edges: edges)
 
             railBar(isPortrait: isPortrait, notchOnLeading: notchOnLeading)
         }
         .frame(width: width, height: height, alignment: .topLeading)
+    }
+
+    // MARK: - Final-URL capture & failure recovery
+
+    /// Successful main-frame load — cache the final URL (post redirects)
+    /// in WebRecoveryStore so the next privacy tap can skip the round-trip.
+    private func handleFinalURL(_ final: URL) {
+        #if DEBUG
+        print("[web] ← server reached, final URL = \(final.absoluteString)")
+        #endif
+        WebRecoveryStore.shared.captureFinal(final)
+    }
+
+    /// Retry-once recovery on a failed load.
+    ///
+    /// First failure:
+    ///   • Compute rescue via `syntheticURL(forBase:)` (or fall back to base)
+    ///     without mutating the store.
+    ///   • If the rescue equals what we just tried, give up — `markFailed()`
+    ///     and dismiss.
+    ///   • Otherwise swap `currentURL` to the rescue. The cover stays
+    ///     mounted; only the WebSurface is recreated by `.id()`.
+    ///
+    /// Second consecutive failure: terminal — `markFailed()` and dismiss.
+    ///
+    /// `markFailed()` flips `savedURL` to nil, which the RootView gate
+    /// reads to consider onboarding passed even if the page never loaded.
+    private func handleFailure(loadedURL url: URL) {
+        let store = WebRecoveryStore.shared
+
+        #if DEBUG
+        print("[web] ✗ load failed for \(url.absoluteString) — didTryRescue=\(didTryRescue)")
+        #endif
+
+        guard !didTryRescue else {
+            #if DEBUG
+            print("[web] terminal failure → markFailed() + dismiss")
+            #endif
+            store.markFailed()
+            onDismiss()
+            return
+        }
+
+        // Pure read — `syntheticURL` is `<baseURL>/<pathID>` if a pathID is
+        // on file, otherwise nil. Fall back to the bare baseURL when no
+        // synthetic is available.
+        let rescue = store.syntheticURL(forBase: baseURL) ?? baseURL
+        #if DEBUG
+        print("[web] computed rescue URL = \(rescue.absoluteString) (baseURL=\(baseURL.absoluteString), pathID=\(store.pathID ?? "nil"))")
+        #endif
+
+        guard rescue.absoluteString != url.absoluteString else {
+            #if DEBUG
+            print("[web] rescue == failing URL → no point retrying → markFailed() + dismiss")
+            #endif
+            store.markFailed()
+            onDismiss()
+            return
+        }
+
+        #if DEBUG
+        print("[web] swapping currentURL to rescue \(rescue.absoluteString)")
+        #endif
+        didTryRescue = true
+        currentURL = rescue
     }
 
     /// Notch-side filler — same color as the rail so the chrome reads as one
@@ -411,8 +500,12 @@ final class WebPilot: ObservableObject {
 private struct WebSurface: UIViewRepresentable {
     let url: URL
     let pilot: WebPilot
+    let onFinalURL: ((URL) -> Void)?
+    let onFailure: (() -> Void)?
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onFinalURL: onFinalURL, onFailure: onFailure)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let cfg = WKWebViewConfiguration()
@@ -436,6 +529,9 @@ private struct WebSurface: UIViewRepresentable {
         view.scrollView.refreshControl = refresh
 
         context.coordinator.attach(view: view, pilot: pilot)
+        #if DEBUG
+        print("[web] → loading \(url.absoluteString)")
+        #endif
         view.load(URLRequest(url: url))
         return view
     }
@@ -451,20 +547,53 @@ private struct WebSurface: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        /// Watchdog timeout for the initial page load. WKWebView can sit on
+        /// a hung connection for tens of seconds (or forever in some
+        /// hostile-offline scenarios) without firing didFail, so we add our
+        /// own deadline. Tuned for a privacy-page-style document — a value
+        /// big enough not to cut off real loads on slow networks, small
+        /// enough that the user doesn't stare at a dark screen.
+        private static let loadWatchdogSeconds: TimeInterval = 8
+
         private weak var view: WKWebView?
         private weak var pilot: WebPilot?
         private var observations: [NSKeyValueObservation] = []
+
+        /// True once we've fired `onFinalURL` for the current load. After
+        /// this, all failure-like signals (4xx/5xx, didFail, watchdog) are
+        /// IGNORED — the user is browsing inside the page now, and a JS-
+        /// driven sub-navigation returning 4xx is not a load failure.
+        private var didCaptureFinalForCurrentLoad = false
+
+        /// True after we've fired `onFailure` for the current load — guards
+        /// against any second failure signal from late delegate callbacks.
+        private var didFireFailureForCurrentLoad = false
+
+        /// Cancellable handle for the load watchdog. Replaced when a new
+        /// load starts; cancelled on capture or terminal failure.
+        private var watchdog: DispatchWorkItem?
+
+        var onFinalURL: ((URL) -> Void)?
+        var onFailure: (() -> Void)?
+
+        init(onFinalURL: ((URL) -> Void)?, onFailure: (() -> Void)?) {
+            self.onFinalURL = onFinalURL
+            self.onFailure = onFailure
+            super.init()
+        }
 
         func attach(view: WKWebView, pilot: WebPilot) {
             self.view = view
             self.pilot = pilot
             pilot.webView = view
             installObservers(on: view)
+            startWatchdog()
         }
 
         func detach() {
             observations.forEach { $0.invalidate() }
             observations.removeAll()
+            cancelWatchdog()
         }
 
         @objc func handleRefresh(_ sender: UIRefreshControl) {
@@ -486,19 +615,105 @@ private struct WebSurface: UIViewRepresentable {
             ]
         }
 
+        // MARK: Watchdog
+
+        private func startWatchdog() {
+            cancelWatchdog()
+            let item = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                guard !self.didCaptureFinalForCurrentLoad,
+                      !self.didFireFailureForCurrentLoad else { return }
+                #if DEBUG
+                print("[web] watchdog fired (\(Self.loadWatchdogSeconds)s) — no didFinish/didFail → treating as failure")
+                #endif
+                self.fireFailure()
+            }
+            watchdog = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.loadWatchdogSeconds, execute: item)
+        }
+
+        private func cancelWatchdog() {
+            watchdog?.cancel()
+            watchdog = nil
+        }
+
+        /// Single funnel for declaring the current load failed. Idempotent.
+        private func fireFailure() {
+            guard !didFireFailureForCurrentLoad else { return }
+            didFireFailureForCurrentLoad = true
+            cancelWatchdog()
+            endRefreshing()
+            onFailure?()
+        }
+
+        // MARK: Navigation delegate
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             endRefreshing()
             Task { @MainActor in pilot?.sync() }
+            // Capture final URL once per load, only for http(s) main-frame.
+            if !didCaptureFinalForCurrentLoad,
+               let url = webView.url,
+               let scheme = url.scheme?.lowercased(),
+               scheme == "http" || scheme == "https"
+            {
+                didCaptureFinalForCurrentLoad = true
+                cancelWatchdog()
+                #if DEBUG
+                print("[web] didFinish OK → final \(url.absoluteString)")
+                #endif
+                onFinalURL?(url)
+            }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            endRefreshing()
+            handleFailure(error, label: "didFail")
         }
 
         func webView(_ webView: WKWebView,
                      didFailProvisionalNavigation navigation: WKNavigation!,
                      withError error: Error) {
-            endRefreshing()
+            handleFailure(error, label: "didFailProvisionalNavigation")
+        }
+
+        /// HTTP status check — treat 4xx/5xx main-frame responses as load
+        /// failures, but ONLY before we've successfully captured a final URL.
+        /// After that, the user is browsing and a 4xx in a sub-flow is
+        /// normal page behavior, not a "load failed" signal.
+        func webView(_ webView: WKWebView,
+                     decidePolicyFor navigationResponse: WKNavigationResponse,
+                     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+            if navigationResponse.isForMainFrame,
+               let http = navigationResponse.response as? HTTPURLResponse {
+                #if DEBUG
+                let phase = didCaptureFinalForCurrentLoad ? "post-final" : "initial"
+                print("[web] response status \(http.statusCode) [\(phase)] for \(http.url?.absoluteString ?? "?")")
+                #endif
+                if !didCaptureFinalForCurrentLoad,
+                   (400...599).contains(http.statusCode) {
+                    decisionHandler(.cancel)
+                    #if DEBUG
+                    print("[web] HTTP \(http.statusCode) treated as failure")
+                    #endif
+                    fireFailure()
+                    return
+                }
+            }
+            decisionHandler(.allow)
+        }
+
+        private func handleFailure(_ error: Error, label: String) {
+            // Ignore user-initiated cancellations (e.g. tapping a new link
+            // before the previous one finished loading).
+            let ns = error as NSError
+            guard ns.code != NSURLErrorCancelled else { return }
+            #if DEBUG
+            print("[web] \(label) → \(ns.domain) code=\(ns.code) — \(ns.localizedDescription)")
+            #endif
+            // After a successful capture, in-page navigation errors are
+            // normal browsing — don't treat them as load failures.
+            guard !didCaptureFinalForCurrentLoad else { return }
+            fireFailure()
         }
 
         func webView(_ webView: WKWebView,
@@ -514,11 +729,17 @@ private struct WebSurface: UIViewRepresentable {
 }
 
 // =============================================================================
-//  Tiny Identifiable URL wrapper so callers can present via
-//  `.fullScreenCover(item:)` without retroactively conforming URL itself.
+//  WebTarget — Identifiable wrapper passed through `.fullScreenCover(item:)`.
+//  Carries BOTH the URL to load first (`url`) and the original base URL
+//  (`baseURL`) so the WebShellView can compute a rescue URL on its own
+//  without going back through the presenter.
+//
+//  `id` is a UUID — stable per presentation. Don't reassign the binding
+//  with a new WebTarget while the cover is open; that'd dismiss & re-present.
 // =============================================================================
 
 struct WebTarget: Identifiable, Hashable {
+    let id = UUID()
     let url: URL
-    var id: String { url.absoluteString }
+    let baseURL: URL
 }
