@@ -31,6 +31,101 @@ final class NoJetLagAppDelegate: NSObject,
     UNUserNotificationCenterDelegate,
     MessagingDelegate
 {
+    /// Weak reference set in `init()`. Used by the static helpers below
+    /// because `UIApplication.shared.delegate as? NoJetLagAppDelegate` fails
+    /// when Firebase swizzles the app delegate (its proxy refuses dynamic
+    /// downcasts even though it forwards method calls correctly).
+    static private(set) weak var shared: NoJetLagAppDelegate?
+
+    override init() {
+        super.init()
+        Self.shared = self
+    }
+
+    // MARK: - Orientation control
+
+    /// Currently allowed orientation mask. Default is portrait — most of the
+    /// app is locked to portrait. WebShellView temporarily widens this to
+    /// `.all` while it's on screen, then restores to portrait on dismiss.
+    var supportedOrientations: UIInterfaceOrientationMask = .portrait
+
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        #if DEBUG
+        print("AppDelegate supportedInterfaceOrientationsFor called → \(supportedOrientations.rawValue)")
+        #endif
+        return supportedOrientations
+    }
+
+    /// Update the allowed orientation mask and ask iOS to re-evaluate
+    /// rotation immediately. Call on `.task` and `.onDisappear` of any view
+    /// that should override the global portrait lock.
+    @MainActor
+    func permitOrientations(_ mask: UIInterfaceOrientationMask) {
+        #if DEBUG
+        print("[orient] permitOrientations(\(mask.rawValue)) — mask was \(supportedOrientations.rawValue)")
+        #endif
+        supportedOrientations = mask
+        DispatchQueue.main.async {
+            // 1. Tell every connected scene to re-evaluate its geometry.
+            if #available(iOS 16.0, *) {
+                for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { error in
+                        #if DEBUG
+                        print("requestGeometryUpdate failed: \(error)")
+                        #endif
+                    }
+                }
+            }
+            // 2. Poke the topmost view controller so it re-queries the
+            //    AppDelegate for the new mask. SwiftUI's UIHostingController
+            //    needs this on iOS 16+ to actually pick up the change inside
+            //    a `.fullScreenCover`.
+            if #available(iOS 16.0, *) {
+                Self.topMostViewController()?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+            // 3. Belt-and-suspenders fallback — this API is deprecated but
+            //    still works as a no-op on modern iOS and forces older
+            //    versions to rotate.
+            UIViewController.attemptRotationToDeviceOrientation()
+        }
+    }
+
+    /// Walk the presented-view-controller chain to find the frontmost VC
+    /// (the one whose orientation actually matters for the current display).
+    @MainActor
+    private static func topMostViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let prime = scenes.first(where: {
+            $0.activationState == .foregroundActive && $0.windows.contains(where: \.isKeyWindow)
+        }) ?? scenes.first
+        guard let window = prime?.windows.first(where: \.isKeyWindow) ?? prime?.windows.first else {
+            return nil
+        }
+        var vc = window.rootViewController
+        while let presented = vc?.presentedViewController {
+            vc = presented
+        }
+        return vc
+    }
+
+    /// Static helper so callers don't need to fish the delegate out of
+    /// `UIApplication`. Uses the in-class `shared` weak reference (set in
+    /// `init()`) because Firebase's app-delegate swizzling breaks the
+    /// `UIApplication.shared.delegate as?` downcast.
+    @MainActor
+    static func permitOrientations(_ mask: UIInterfaceOrientationMask) {
+        guard let delegate = shared else {
+            #if DEBUG
+            print("[orient] ❌ NoJetLagAppDelegate.shared is nil — was init() called?")
+            #endif
+            return
+        }
+        delegate.permitOrientations(mask)
+    }
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
