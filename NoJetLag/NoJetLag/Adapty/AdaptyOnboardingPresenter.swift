@@ -28,6 +28,14 @@ struct AdaptyOnboardingPresenter: View {
             content
         }
         .task(id: phaseKey) { await load() }
+        .task {
+            // Prompt for push permission as soon as the Adapty onboarding
+            // appears. iOS shows the system alert overlaying whatever's on
+            // screen, so the user sees it together with the first onboarding
+            // screen. Only fires when status is `.notDetermined` — no
+            // re-prompts on subsequent launches.
+            await NoJetLagAppDelegate.requestPushAuthorizationIfNeeded()
+        }
     }
 
     @ViewBuilder
@@ -42,9 +50,6 @@ struct AdaptyOnboardingPresenter: View {
                 onCloseAction: { _ in
                     onComplete()
                 },
-                onCustomAction: { action in
-                    handleCustomAction(action)
-                },
                 onError: { error in
                     phase = .error(message(for: error))
                 }
@@ -52,28 +57,6 @@ struct AdaptyOnboardingPresenter: View {
             .ignoresSafeArea()
         case .error(let message):
             errorView(message: message)
-        }
-    }
-
-    /// Handles `Custom` button actions that the user wires up in the Adapty
-    /// Onboarding Builder. The `actionId` is the string the user enters when
-    /// configuring the button.
-    ///
-    /// To make a button trigger the iOS push permission prompt:
-    ///   1. In Adapty Dashboard → Onboarding Builder → add a button.
-    ///   2. Set its action to **Custom** with Action ID `allowNotifications`.
-    ///   3. Tapping the button on the device will fire this handler, which
-    ///      shows the system "Allow Notifications" prompt.
-    private func handleCustomAction(_ action: AdaptyOnboardingsCustomAction) {
-        switch action.actionId {
-        case "allowNotifications":
-            Task { @MainActor in
-                await NoJetLagAppDelegate.requestPushAuthorizationIfNeeded()
-            }
-        default:
-            #if DEBUG
-            print("Unhandled Adapty onboarding custom action: \(action.actionId)")
-            #endif
         }
     }
 

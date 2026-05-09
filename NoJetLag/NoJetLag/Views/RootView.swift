@@ -50,10 +50,8 @@ struct RootView: View {
         }
         // Boot the ambient player only once both gates have passed and the
         // tab bar appears — keeps the onboarding/disclaimer screens silent.
-        // Also prompt for push permission here, the first time only.
         .task {
             state.startAmbiencePlayback()
-            await NoJetLagAppDelegate.requestPushAuthorizationIfNeeded()
         }
     }
 }

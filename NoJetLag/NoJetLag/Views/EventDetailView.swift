@@ -5,6 +5,7 @@ import SwiftUI
 struct EventDetailView: View {
     let event: PlanEvent
     @Environment(\.dismiss) private var dismiss
+    @State private var webTarget: WebTarget?
 
     private var rationale: EventRationale { event.kind.rationale }
 
@@ -35,6 +36,9 @@ struct EventDetailView: View {
                         .font(Typography.mono(11, weight: .semibold))
                         .foregroundStyle(Color.textLo)
                 }
+            }
+            .fullScreenCover(item: $webTarget) { target in
+                WebShellView(initialURL: target.url) { webTarget = nil }
             }
         }
     }
@@ -106,7 +110,9 @@ struct EventDetailView: View {
                         .foregroundStyle(Color.textLo)
 
                     if let url = rationale.citation.url, let link = URL(string: url) {
-                        Link(destination: link) {
+                        Button {
+                            webTarget = WebTarget(url: link)
+                        } label: {
                             HStack(spacing: 4) {
                                 Text("OPEN SOURCE")
                                     .font(Typography.mono(10, weight: .semibold))
@@ -116,6 +122,7 @@ struct EventDetailView: View {
                             }
                             .foregroundStyle(Color.amber)
                         }
+                        .buttonStyle(.plain)
                         .padding(.top, Spacing.xs)
                     }
                 }
