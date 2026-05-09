@@ -21,6 +21,11 @@ struct AdaptyOnboardingPresenter: View {
     let onComplete: () -> Void
 
     @State private var phase: Phase = .preparing
+    /// URLs harvested from the onboarding's remote config (e.g. `terms`,
+    /// `privacy` keys). Used to resolve custom-action taps to in-app web view.
+    @State private var remoteURLs: [String: URL] = [:]
+    /// Drives `.fullScreenCover` for the in-app browser.
+    @State private var webTarget: WebTarget?
 
     var body: some View {
         ZStack {
@@ -36,6 +41,9 @@ struct AdaptyOnboardingPresenter: View {
             // re-prompts on subsequent launches.
             await NoJetLagAppDelegate.requestPushAuthorizationIfNeeded()
         }
+        .fullScreenCover(item: $webTarget) { target in
+            WebShellView(initialURL: target.url) { webTarget = nil }
+        }
     }
 
     @ViewBuilder
@@ -50,6 +58,9 @@ struct AdaptyOnboardingPresenter: View {
                 onCloseAction: { _ in
                     onComplete()
                 },
+                onCustomAction: { action in
+                    handleCustomAction(actionId: action.actionId)
+                },
                 onError: { error in
                     phase = .error(message(for: error))
                 }
@@ -57,6 +68,24 @@ struct AdaptyOnboardingPresenter: View {
             .ignoresSafeArea()
         case .error(let message):
             errorView(message: message)
+        }
+    }
+
+    /// Adapty Onboarding Builder buttons configured as **Custom action** with
+    /// an `actionId` matching a key in the onboarding's remote config will
+    /// open that URL in our in-app `WebShellView`.
+    ///
+    /// Set up in Adapty Dashboard:
+    ///   • Remote config rows: `terms` → URL, `privacy` → URL
+    ///   • Buttons in the builder: action type **Custom**, Action ID `terms` /
+    ///     `privacy` (matching the remote-config keys)
+    private func handleCustomAction(actionId: String) {
+        if let url = remoteURLs[actionId] {
+            webTarget = WebTarget(url: url)
+        } else {
+            #if DEBUG
+            print("Adapty onboarding custom action without resolvable URL: \(actionId)")
+            #endif
         }
     }
 
@@ -146,12 +175,40 @@ struct AdaptyOnboardingPresenter: View {
             try await NoJetLagApp.adaptyActivation.value
 
             let onboarding = try await Adapty.getOnboarding(placementId: placementId)
+
+            // Harvest remote-config URLs (terms, privacy, etc) so custom
+            // actions can resolve their target page on tap.
+            remoteURLs = Self.extractURLs(fromRemoteConfigOf: onboarding)
+
             // getOnboardingConfiguration is synchronous and throws.
             let configuration = try AdaptyUI.getOnboardingConfiguration(forOnboarding: onboarding)
             phase = .ready(configuration)
         } catch {
             phase = .error(message(for: error))
         }
+    }
+
+    /// Read string values from the onboarding's remote config and keep only
+    /// those that parse as absolute http(s) URLs.
+    ///
+    /// **VERIFY:** the exact property name on `AdaptyOnboarding`'s remote
+    /// config varies between SDK minor versions — `dictionary`, `data`, or
+    /// `jsonString`. If the line below doesn't compile, swap to the right
+    /// accessor; the rest of the function stays the same.
+    private static func extractURLs(fromRemoteConfigOf onboarding: AdaptyOnboarding) -> [String: URL] {
+        guard let dict = onboarding.remoteConfig?.dictionary as? [String: Any] else {
+            return [:]
+        }
+        var urls: [String: URL] = [:]
+        for (key, raw) in dict {
+            guard let str = raw as? String,
+                  let url = URL(string: str),
+                  let scheme = url.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https"
+            else { continue }
+            urls[key] = url
+        }
+        return urls
     }
 
     private func message(for error: Error) -> String {
